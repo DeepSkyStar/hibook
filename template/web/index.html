@@ -109,13 +109,15 @@
       // loadSidebar: true,
       // 强制添加时间戳以清除缓存
       loadSidebar: 'SUMMARY.md?v=' + Date.now(),
-      loadNavbar: true,
+      loadNavbar: false,
+      relativePath: true,
       subMaxLevel: 1, // 仅提取一级标题 (H1) 显示在侧边栏，避免深层标题导致抖动
       sidebarDisplayLevel: 2, // 默认展开两层 (显示知识体系的子目录)
       auto2top: true,
       alias: {
         '/.*/_sidebar.md': '/_sidebar.md',
-        '/.*/_navbar.md': '/_navbar.md'
+        '/.*/_navbar.md': '/_navbar.md',
+        '/.*/SUMMARY\\.md.*': '/SUMMARY.md'
       },
       // 禁用侧边栏自动滚动到活动链接 (防止跳动)
       autoHeader: false,
