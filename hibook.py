@@ -38,11 +38,17 @@ def __create(args):
         
     readme_path = os.path.join(target_dir, 'README.md')
     with open(readme_path, 'w', encoding='utf-8') as f:
-        f.write(f"# {name.capitalize()}\n\nWelcome to your new hibook!\n")
+        f.write(f"# {name.capitalize()}\n\nWelcome to your new hibook!\n\n> **Note**: This knowledge base strictly follows the [Knowledge Management Rules](RULE.md).\n")
         
     summary_path = os.path.join(target_dir, 'SUMMARY.md')
     with open(summary_path, 'w', encoding='utf-8') as f:
-        f.write("* [Overview](README.md)\n")
+        f.write(f"* [{name.capitalize()}](README.md)\n* [Rules](RULE.md)\n")
+        
+    tool_dir = os.path.dirname(os.path.abspath(__file__))
+    src_rule = os.path.join(tool_dir, 'template', 'RULE.md')
+    dest_rule = os.path.join(target_dir, 'RULE.md')
+    if os.path.exists(src_rule):
+        shutil.copy2(src_rule, dest_rule)
         
     HiLog.info(f"Successfully created new hibook project in '{name}'")
     HiLog.info(f"Run `cd {name}` and then `hibook web` to view it.")
@@ -137,6 +143,94 @@ def parse_summary(summary_path):
             level = len(indent) // 2
             files.append((title, path, level))
     return files
+
+def get_title(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('# '):
+                    return line[2:].strip()
+    except:
+        pass
+    name_without_ext = os.path.splitext(os.path.basename(file_path))[0]
+    return name_without_ext
+
+def process_folder(folder_path, root_dir, level):
+    lines = []
+    indent = "  " * level 
+    try:
+        items = os.listdir(folder_path)
+    except OSError:
+        return []
+
+    files = []
+    dirs = []
+    for item in items:
+        if item.startswith('.') or item in ['export', 'assets', 'rule']: continue
+        full_path = os.path.join(folder_path, item)
+        if os.path.isdir(full_path):
+            dirs.append(item)
+        elif item.endswith('.md'):
+            files.append(item)
+            
+    files.sort()
+    dirs.sort()
+    
+    for file in files:
+        if file.lower() == 'readme.md' or file in ['SUMMARY.md', 'RULE.md']:
+            continue
+            
+        file_path = os.path.join(folder_path, file)
+        rel_path = os.path.relpath(file_path, root_dir)
+        title = get_title(file_path)
+        
+        lines.append(f"{indent}* [{title}]({rel_path})")
+        
+    for d in dirs:
+        dir_path = os.path.join(folder_path, d)
+        readme_path = os.path.join(dir_path, 'README.md')
+        
+        display_title = d.title()
+        link = ""
+        
+        if os.path.exists(readme_path):
+            display_title = get_title(readme_path)
+            link = os.path.relpath(readme_path, root_dir)
+        
+        sub_files = [f for f in os.listdir(dir_path) if f.endswith('.md')]
+        if link:
+            lines.append(f"{indent}* [{display_title}]({link})")
+            lines.extend(process_folder(dir_path, root_dir, level + 1))
+        elif sub_files:
+            lines.append(f"{indent}* {display_title}")
+            lines.extend(process_folder(dir_path, root_dir, level + 1))
+
+    return lines
+
+def __update(args):
+    root_dir = os.getcwd()
+    summary_path = os.path.join(root_dir, 'SUMMARY.md')
+    
+    content = []
+    
+    readme_path = os.path.join(root_dir, 'README.md')
+    if os.path.exists(readme_path):
+        title = get_title(readme_path)
+        content.append(f"* [{title}](README.md)")
+    else:
+        content.append("* [Overview](README.md)")
+        
+    rule_path = os.path.join(root_dir, 'RULE.md')
+    if os.path.exists(rule_path):
+        content.append("* [Rules](RULE.md)")
+        
+    content.extend(process_folder(root_dir, root_dir, level=0))
+
+    with open(summary_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(content) + '\n')
+        
+    HiLog.info(f"Successfully updated {summary_path}")
+    pass
 
 def read_file_content(file_path, root_dir):
     full_path = os.path.join(root_dir, file_path)
@@ -401,6 +495,12 @@ def __setup_parser():
         action="store"
     )
     parser_web.set_defaults(func=__web)
+
+    parser_update = subparsers.add_parser(
+        name="update",
+        help=HiText("menu_update_help", "Update SUMMARY.md from directory structure.")
+        )
+    parser_update.set_defaults(func=__update)
 
     parser_export = subparsers.add_parser(
         name="export",
