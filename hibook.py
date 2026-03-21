@@ -14,6 +14,40 @@ def __info(args):
     print(appinfo.name + " " + appinfo.version + " by " + appinfo.owner if appinfo.owner else "Unknown")
     pass
 
+def __create(args):
+    name = args.get("name")
+    if type(name) == list and len(name) > 0:
+        name = name[0]
+    
+    if not name:
+        HiLog.error("Please provide a name for the new book directory.")
+        return
+        
+    root_dir = os.getcwd()
+    target_dir = os.path.join(root_dir, name)
+    
+    if os.path.exists(target_dir):
+        HiLog.error(f"Directory {name} already exists.")
+        return
+        
+    os.makedirs(target_dir)
+    
+    gitignore_path = os.path.join(target_dir, '.gitignore')
+    with open(gitignore_path, 'w', encoding='utf-8') as f:
+        f.write(".hibook_web/\nexport/\nindex.html\n")
+        
+    readme_path = os.path.join(target_dir, 'README.md')
+    with open(readme_path, 'w', encoding='utf-8') as f:
+        f.write(f"# {name.capitalize()}\n\nWelcome to your new hibook!\n")
+        
+    summary_path = os.path.join(target_dir, 'SUMMARY.md')
+    with open(summary_path, 'w', encoding='utf-8') as f:
+        f.write("* [Overview](README.md)\n")
+        
+    HiLog.info(f"Successfully created new hibook project in '{name}'")
+    HiLog.info(f"Run `cd {name}` and then `hibook web` to view it.")
+    pass
+
 def __web(args):
     port = args.get("port", 3000)
     if not port:
@@ -21,11 +55,74 @@ def __web(args):
     else:
         port = int(port[0])
     
+    tool_dir = os.path.dirname(os.path.abspath(__file__))
+    web_template_dir = os.path.join(tool_dir, 'template', 'web')
+    root_dir = os.getcwd()
+    hibook_web_dir = os.path.join(root_dir, '.hibook_web')
+    
+    # copy assets
+    src_assets = os.path.join(web_template_dir, 'assets')
+    if os.path.exists(src_assets):
+        if not os.path.exists(hibook_web_dir):
+            shutil.copytree(src_assets, hibook_web_dir)
+        else:
+            shutil.copytree(src_assets, hibook_web_dir, dirs_exist_ok=True)
+            
+    # inject index.html if not present
+    index_path = os.path.join(root_dir, 'index.html')
+    if not os.path.exists(index_path):
+        src_index = os.path.join(web_template_dir, 'index.html')
+        if os.path.exists(src_index):
+            shutil.copy2(src_index, index_path)
+            HiLog.info("Injected Docsify index.html into current directory.")
+
     HiLog.info(f"Starting web server at http://localhost:{port}")
     HiLog.info("Press Ctrl+C to stop.")
     
-    os.system(f"python3 -m http.server {port}")
-    pass
+    import http.server
+    import socketserver
+    import urllib.parse
+
+    class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            path_no_query = self.path.split('?')[0]
+            if path_no_query.endswith('.md'):
+                local_path = urllib.parse.unquote(path_no_query.lstrip('/'))
+                if os.path.exists(local_path) and os.path.isfile(local_path):
+                    with open(local_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        
+                    def process_mermaid_block(match):
+                        mermaid_code = match.group(1)
+                        def replace_mermaid_link(link_match):
+                            node_id = link_match.group(1)
+                            url = link_match.group(2)
+                            if url.startswith('http') or url.startswith('#') or url.startswith('/#'):
+                                return link_match.group(0)
+                            return f'click {node_id} "/#/{url}"'
+                        mermaid_code = re.sub(r'click\s+(\w+)\s+"([^"]+)"', replace_mermaid_link, mermaid_code)
+                        return f'```mermaid\n{mermaid_code}\n```'
+                        
+                    content = re.sub(r'```mermaid\s*\n(.*?)\n```', process_mermaid_block, content, flags=re.DOTALL)
+                    
+                    encoded = content.encode('utf-8')
+                    self.send_response(200)
+                    self.send_header("Content-type", "text/markdown; charset=utf-8")
+                    self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    self.send_header("Pragma", "no-cache")
+                    self.send_header("Expires", "0")
+                    self.send_header("Content-Length", str(len(encoded)))
+                    self.end_headers()
+                    self.wfile.write(encoded)
+                    return
+            super().do_GET()
+
+    socketserver.TCPServer.allow_reuse_address = True
+    with socketserver.TCPServer(("", port), HibookHTTPRequestHandler) as httpd:
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            pass
 
 def parse_summary(summary_path):
     with open(summary_path, 'r', encoding='utf-8') as f:
@@ -281,6 +378,17 @@ def __setup_parser():
         help=HiText("menu_info_help", "View tool's version and owner.")
         )
     parser_info.set_defaults(func=__info)
+
+    parser_create = subparsers.add_parser(
+        name="create",
+        help=HiText("menu_create_help", "Create a new hibook project directory.")
+        )
+    parser_create.add_argument(
+        "name",
+        help=HiText("menu_create_name", "Name of the directory to create"),
+        nargs=1
+    )
+    parser_create.set_defaults(func=__create)
 
     parser_web = subparsers.add_parser(
         name="web",

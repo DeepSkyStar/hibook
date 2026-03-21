@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DFC Library</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="Description">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <link rel="stylesheet" href=".hibook_web/vue.css">
+  <link rel="stylesheet" href=".hibook_web/sidebar.min.css" />
+  <link rel="stylesheet" href=".hibook_web/katex.min.css" />
+  <style>
+    /* 移动端适配修复 */
+    @media screen and (max-width: 768px) {
+      /* 让导航栏不再绝对定位，而是占据文档流空间，避免重叠 */
+      .app-nav {
+        position: static !important;
+        margin: 0 !important;
+        padding: 10px 15px !important; /* 增加左右内边距 */
+        text-align: right !important; /* 改为右对齐 */
+      }
+      
+      /* 调整内容区域的顶部内边距 */
+      .content {
+        padding-top: 10px !important;
+      }
+
+      /* 确保导航栏列表项在移动端也能正常显示 */
+      .app-nav li {
+        display: inline-block;
+        margin: 0 5px;
+      }
+    }
+
+    /* 侧边栏箭头放大优化 */
+    .sidebar-nav ul:not(.app-sub-sidebar) > li:not(.file)::before {
+        width: 10px !important;
+        height: 10px !important;
+        border-right-width: 2px !important;
+        border-bottom-width: 2px !important;
+        left: -20px !important; /* 向左移，避免遮挡文字 */
+        top: 10px !important;   /* 垂直居中微调 */
+    }
+    
+    /* 增加左侧缩进，给大箭头腾出空间 */
+    .sidebar ul {
+        padding-left: 25px !important;
+    }
+
+    /* --- 可拖拽侧边栏 (Resizable Sidebar) --- */
+    :root {
+        --sidebar-width: 300px; /* 默认宽度 */
+    }
+
+    /* 仅在桌面端应用拖拽逻辑 */
+    @media screen and (min-width: 769px) {
+        /* 覆盖 Docsify 默认的固定宽度 */
+        body.sticky .sidebar,
+        .sidebar {
+            width: var(--sidebar-width) !important;
+        }
+        
+        /* 覆盖内容区域的左边距 */
+        body.sticky .content,
+        .content {
+            left: var(--sidebar-width) !important;
+        }
+
+        /* 当侧边栏关闭时，内容占满，同时隐藏拖拽条 */
+        body.close .content {
+            left: 0 !important;
+        }
+        body.close .sidebar-resizer {
+            display: none;
+        }
+
+        /* 拖拽把手样式 */
+        .sidebar-resizer {
+            position: fixed;
+            width: 8px; /* 稍微窄一点，但响应范围大 */
+            top: 0;
+            bottom: 0;
+            left: var(--sidebar-width, 300px); /* 增加默认值 fallback */
+            margin-left: -4px; /* 居中 */
+            cursor: col-resize;
+            z-index: 99999; /* 足够大 */
+            transition: background-color 0.2s;
+            /* 辅助对齐线 */
+            border-left: 1px solid rgba(0,0,0,0.05); 
+        }
+
+        .sidebar-resizer:hover,
+        .sidebar-resizer.active {
+            background-color: #42b983; /* 绿色高亮，让用户明确看到 */
+            opacity: 0.8;
+            width: 12px; /* 悬停时变宽方便抓住 */
+            margin-left: -6px;
+        }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">加载中...</div>
+    <script>
+    window.$docsify = {
+      name: 'Hibook Library',
+      repo: '',
+      homepage: 'README.md',
+      // loadSidebar: true,
+      // 强制添加时间戳以清除缓存
+      loadSidebar: 'SUMMARY.md?v=' + Date.now(),
+      loadNavbar: true,
+      subMaxLevel: 1, // 仅提取一级标题 (H1) 显示在侧边栏，避免深层标题导致抖动
+      sidebarDisplayLevel: 2, // 默认展开两层 (显示知识体系的子目录)
+      auto2top: true,
+      alias: {
+        '/.*/_sidebar.md': '/_sidebar.md',
+        '/.*/_navbar.md': '/_navbar.md'
+      },
+      // 禁用侧边栏自动滚动到活动链接 (防止跳动)
+      autoHeader: false,
+      markdown: {
+        renderer: {
+          code: function(code, lang) {
+            if (lang === "mermaid") {
+              return (
+                '<div class="mermaid">' + code + "</div>"
+              );
+            }
+            return this.origin.code.apply(this, arguments);
+          }
+        }
+      },
+      // 自定义插件：保持侧边栏滚动位置 + 拖拽调整宽度
+      plugins: [
+        function(hook, vm) {
+          // --- Sidebar Resizer Logic Start ---
+          hook.mounted(function() {
+            var resizer = document.createElement('div');
+            resizer.classList.add('sidebar-resizer');
+            document.body.appendChild(resizer);
+
+            var storedWidth = localStorage.getItem('sidebar-width');
+            if (storedWidth && !isNaN(parseInt(storedWidth))) {
+                document.documentElement.style.setProperty('--sidebar-width', parseInt(storedWidth) + 'px');
+            } else {
+                document.documentElement.style.setProperty('--sidebar-width', '300px');
+            }
+
+            var isResizing = false;
+            
+            function disableSelect() {
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'col-resize';
+            }
+            function enableSelect() {
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+            }
+
+            resizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                resizer.classList.add('active');
+                disableSelect();
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+                var newWidth = e.clientX;
+                if (newWidth < 200) newWidth = 200;
+                if (newWidth > 800) newWidth = 800;
+                document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+            });
+
+            document.addEventListener('mouseup', function(e) {
+                if (isResizing) {
+                    isResizing = false;
+                    resizer.classList.remove('active');
+                    enableSelect();
+                    var currentWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width').trim();
+                    localStorage.setItem('sidebar-width', parseInt(currentWidth));
+                }
+            });
+          });
+          // --- Sidebar Resizer Logic End ---
+
+          hook.doneEach(function() {
+            // Mermaid v10+ integration
+            if (window.mermaid) {
+              window.mermaid.run({
+                nodes: document.querySelectorAll('.mermaid')
+              });
+            }
+          });
+
+          hook.doneEach(function() {
+            var sidebar = document.querySelector('.sidebar');
+            var scrollPosition = sessionStorage.getItem('sidebar-scroll');
+            
+            // 1. 恢复滚动位置 (使用 setTimeout 等待 DOM 渲染和展开动画完成)
+            if (sidebar && scrollPosition) {
+               setTimeout(function() {
+                   sidebar.scrollTop = scrollPosition;
+               }, 100); // 100ms 延迟，确保 sidebar 展开逻辑已执行
+            }
+            
+            // 2. 重新绑定滚动监听
+            if (sidebar) {
+                 // 延迟绑定监听，避免恢复滚动位置时触发 onscroll 并存入 0
+                 setTimeout(function() {
+                    sidebar.onscroll = function(e) {
+                         // 只有当 scrollTop 大于 0 或确定不是重置行为时才写入
+                         // 但实际上 0 也是有效位置。延迟绑定已经规避了初始化时的 0
+                         sessionStorage.setItem('sidebar-scroll', e.target.scrollTop);
+                    };
+                 }, 300); // 比恢复位置更晚一点绑定
+            }
+          });
+
+          // hook.ready 部分可以移除了，或者保留作为双保险
+          hook.ready(function() {
+             // ...
+          });
+        }
+      ]
+    }
+  </script>
+  <!-- Docsify v4 -->
+  <script src=".hibook_web/docsify.min.js"></script>
+  <!-- Docsify Sidebar Collapse (Local Modified) -->
+  <script src=".hibook_web/docsify-sidebar-collapse.js?v=20260114"></script>
+  <!-- Mobile Gestures -->
+  <script src=".hibook_web/mobile-gestures.js"></script>
+  <!-- Mermaid v10+ (ESM) - CDN Fallback for reliability -->
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: false });
+    window.mermaid = mermaid;
+    
+    // Handle race condition: if Docsify rendered before Mermaid loaded
+    var nodes = document.querySelectorAll('.mermaid');
+    if (nodes.length > 0) {
+      mermaid.run({ nodes: nodes });
+    }
+  </script>
+  <!-- KaTeX -->
+  <script src=".hibook_web/katex.min.js"></script>
+  <script src=".hibook_web/docsify-katex.js"></script>
+</body>
+</html>
