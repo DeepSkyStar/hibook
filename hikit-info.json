@@ -1,0 +1,17 @@
+{
+    "name": "hibook",
+    "owner": "",
+    "contact": "",
+    "desc": "hibook",
+    "version": "1.0.0",
+    "type": "app",
+    "remote": "",
+    "is_default" : false,
+    "commands":[
+        "hibook"
+    ],
+    "resources":[
+    ],
+    "dependencies":[
+    ]
+}
