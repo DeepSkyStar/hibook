@@ -231,8 +231,8 @@
   function editorDocsifyPlugin(hook, vm) {
       hook.mounted(function() {
           if (window.addToolbarButton) {
-              window.addToolbarButton('btn-edit', '✏️', 'Edit', toggleEditMode);
-              window.addToolbarButton('btn-sync', '🔄', 'Sync', syncRepository);
+              window.addToolbarButton('btn-edit', '✏️', 'Edit', toggleEditMode, 20);
+              window.addToolbarButton('btn-sync', '🔄', 'Sync', syncRepository, 30);
           }
           
           // Attach routing state so we can access file path

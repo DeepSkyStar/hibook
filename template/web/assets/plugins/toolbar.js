@@ -68,7 +68,7 @@
   }
 
   // Globally expose function to register toolbar buttons
-  window.addToolbarButton = function(id, icon, text, onClick) {
+  window.addToolbarButton = function(id, icon, text, onClick, order = 0) {
     let toolbar = document.getElementById('hibook-toolbar');
     if (!toolbar) {
       initToolbar();
@@ -91,6 +91,7 @@
     btn.style.borderRadius = '50%';
     btn.style.cursor = 'pointer';
     btn.style.transition = 'background-color 0.2s, transform 0.2s';
+    btn.style.order = order.toString();
     
     btn.onmouseenter = () => {
         btn.style.backgroundColor = 'rgba(66, 185, 131, 0.15)';

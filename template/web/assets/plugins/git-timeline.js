@@ -68,32 +68,37 @@ function gitTimelinePlugin(hook, vm) {
     historyModal.style.justifyContent = 'center';
     historyModal.style.alignItems = 'center';
     
-    const hCloseBtn = document.createElement('div');
-    hCloseBtn.innerHTML = '✕';
-    hCloseBtn.style.position = 'absolute';
-    hCloseBtn.style.top = '20px';
-    hCloseBtn.style.right = '30px';
-    hCloseBtn.style.color = '#fff';
-    hCloseBtn.style.fontSize = '30px';
-    hCloseBtn.onclick = () => {
-        historyModal.style.display = 'none';
-    };
-    historyModal.appendChild(hCloseBtn);
-    
     const hContainer = document.createElement('div');
-    hContainer.style.width = '80vw';
-    hContainer.style.height = '85vh';
-    hContainer.style.backgroundColor = '#fff';
+    const isMobile = window.innerWidth <= 768;
+    hContainer.style.width = isMobile ? '95vw' : '80vw';
+    hContainer.style.height = isMobile ? '90vh' : '85vh';
+    hContainer.style.backgroundColor = '#ffffff';
+    hContainer.style.color = '#333333';
     hContainer.style.borderRadius = '8px';
-    hContainer.style.padding = '30px';
+    hContainer.style.padding = isMobile ? '40px 15px 15px 15px' : '30px'; 
     hContainer.style.overflowY = 'auto';
     hContainer.style.boxSizing = 'border-box';
     hContainer.style.position = 'relative';
     
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-       hContainer.style.backgroundColor = '#1e1e1e';
-       hContainer.style.color = '#ccc';
-    }
+    // Create close button INSIDE the container so it never overlaps invisibly
+    const hCloseBtn = document.createElement('div');
+    hCloseBtn.innerHTML = '✕';
+    hCloseBtn.style.position = 'absolute';
+    hCloseBtn.style.top = isMobile ? '10px' : '15px';
+    hCloseBtn.style.right = isMobile ? '15px' : '20px';
+    hCloseBtn.style.color = '#999';
+    hCloseBtn.style.fontSize = '24px';
+    hCloseBtn.style.cursor = 'pointer';
+    hCloseBtn.style.zIndex = '9999';
+    hCloseBtn.onclick = () => {
+        historyModal.style.display = 'none';
+    };
+    
+    // Ensure mouse hover feedback
+    hCloseBtn.onmouseenter = () => hCloseBtn.style.color = '#333';
+    hCloseBtn.onmouseleave = () => hCloseBtn.style.color = '#999';
+    
+    hContainer.appendChild(hCloseBtn);
     
     historyModalContent = document.createElement('div');
     historyModalContent.className = 'markdown-section'; // Inherit Docsify styles
@@ -182,7 +187,7 @@ function gitTimelinePlugin(hook, vm) {
   hook.mounted(function() {
       initTimelineUI();
       if (window.addToolbarButton) {
-          window.addToolbarButton('btn-git-timeline', '⏱️', 'History', openTimelineDrawer);
+          window.addToolbarButton('btn-git-timeline', '⏱️', 'History', openTimelineDrawer, 40);
       }
   });
 

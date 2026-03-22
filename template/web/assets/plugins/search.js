@@ -201,7 +201,7 @@
     // Also mount a button in toolbar
     function mountToolbarButton() {
         if (window.addToolbarButton) {
-            window.addToolbarButton('btn-search', '🔍', 'Search', showSearch);
+            window.addToolbarButton('btn-search', '🔍', 'Search', showSearch, 10);
         } else {
             setTimeout(mountToolbarButton, 100);
         }

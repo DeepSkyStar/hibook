@@ -18,6 +18,42 @@
     display: inline-block;
     margin: 0 5px;
   }
+
+  /* 彻底重塑原生左侧汉堡菜单，使其外观与右上角悬浮胶囊一模一样！ */
+  .sidebar-toggle {
+    width: 40px !important;       /* 绝对物理宽度 40px (右侧是 30内核 + 8填充 + 2边线) */
+    height: 40px !important;
+    padding: 0 !important;        
+    margin: 0 !important;         /* 清除 Docsify 原生的 margin 外边距惹的祸 */
+    background-color: #fff !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+    border-radius: 50% !important; /* 让高度宽度完全相等时，呈现与右侧完全对齐的正圆 */
+    border: 1px solid #eee !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    
+    /* 强行接管位置坐标：镜像映射右上角工具栏的 top: 15, right: 20 */
+    position: fixed !important;
+    top: 15px !important;
+    left: 20px !important;
+    bottom: auto !important; /* 覆盖 docsify 原生的 bottom: 0 */
+  }
+  
+  .sidebar-toggle span {
+    background: #888 !important; /* 对齐右侧图标的灰色 */
+  }
+  
+  .sidebar-toggle .sidebar-toggle-button {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 14px !important; 
+    height: 12px !important; 
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
 }
 
 /* ==========================================================================
@@ -102,26 +138,26 @@ details summary {
 }
 
 /* ==========================================================================
-   重新定位侧边栏开关 (Sidebar Toggle Relocation)
+   重新定位侧边栏开关 (Sidebar Toggle Fixed Symmetry)
    ========================================================================== */
 .sidebar-toggle {
     position: fixed !important;
     top: 15px !important;
     bottom: auto !important;
-    left: var(--sidebar-width, 300px) !important;
+    left: 20px !important; /* 静态锚定在左上角，与右侧 right:20px 绝对等距 */
+    margin: 0 !important;
     background-color: #fff !important;
     border: 1px solid #eee !important;
-    border-left: none !important;
-    border-radius: 0 20px 20px 0 !important;
-    box-shadow: 2px 2px 10px rgba(0,0,0,0.05) !important;
-    padding: 10px !important;
-    width: 32px !important;  
-    height: 32px !important; /* 与右上角工具栏高度一致 */
+    border-radius: 50% !important; /* 永远保持圆球造型 */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+    padding: 0 !important;
+    width: 40px !important;  
+    height: 40px !important; /* 强制拉平尺寸，与右上角的物理胶囊严格一致 */
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
-    /* Removed 'left' from transition so it instantly snaps to the dragged splitter */
+    box-sizing: border-box !important;
     transition: transform 0.2s, background-color 0.2s !important;
     z-index: var(--z-layer-fixed-ui) !important;
     cursor: pointer !important;
@@ -142,22 +178,4 @@ details summary {
 
 .sidebar-toggle span:last-child {
     margin-bottom: 0 !important;
-}
-
-/* 当侧边栏收回时，开关贴靠最左侧并且变成完整的圆角胶囊 */
-body.close .sidebar-toggle {
-    left: 0 !important;
-    border-left: 1px solid #eee !important;
-    border-radius: 50% !important; /* 收拢成圆形球 */
-    margin-left: 20px !important; /* 和右上角的 right: 20px 对称 */
-}
-
-/* 适配移动端：原生行为是在移动端弹出遮罩，不需要做复杂的左侧位移，贴靠屏幕即可 */
-@media screen and (max-width: 768px) {
-    .sidebar-toggle {
-        left: 0 !important;
-        border-left: 1px solid #eee !important;
-        border-radius: 50% !important;
-        margin-left: 10px !important;
-    }
 }

@@ -14,7 +14,7 @@
 
   function setupGraphUI() {
     if (window.addToolbarButton) {
-        window.addToolbarButton('btn-graph-view', '🕸️', 'Graph', openGraphModal);
+        window.addToolbarButton('btn-graph-view', '🕸️', 'Graph', openGraphModal, 50);
     } else {
         // Fallback if toolbar.js is missing
         const btn = document.createElement('div');
