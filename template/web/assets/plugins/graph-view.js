@@ -13,28 +13,32 @@
   }
 
   function setupGraphUI() {
-    const btn = document.createElement('div');
-    btn.innerHTML = '🕸️ Graph';
-    btn.style.position = 'fixed';
-    btn.style.bottom = '20px';
-    btn.style.right = '20px';
-    btn.style.backgroundColor = 'var(--theme-color, #42b983)';
-    btn.style.color = '#fff';
-    btn.style.padding = '10px 15px';
-    btn.style.borderRadius = '30px';
-    btn.style.cursor = 'pointer';
-    btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.2)';
-    btn.style.zIndex = '9999';
-    btn.style.fontFamily = 'var(--baseFontFamily, sans-serif)';
-    btn.style.fontWeight = 'bold';
-    btn.onclick = openGraphModal;
-    
-    // Add hover effect
-    btn.onmouseenter = () => btn.style.transform = 'scale(1.05)';
-    btn.onmouseleave = () => btn.style.transform = 'scale(1)';
-    btn.style.transition = 'transform 0.2s';
-    
-    document.body.appendChild(btn);
+    if (window.addToolbarButton) {
+        window.addToolbarButton('btn-graph-view', '🕸️', 'Graph', openGraphModal);
+    } else {
+        // Fallback if toolbar.js is missing
+        const btn = document.createElement('div');
+        btn.innerHTML = '🕸️ Graph';
+        btn.style.position = 'fixed';
+        btn.style.bottom = '20px';
+        btn.style.right = '20px';
+        btn.style.backgroundColor = 'var(--theme-color, #42b983)';
+        btn.style.color = '#fff';
+        btn.style.padding = '10px 15px';
+        btn.style.borderRadius = '30px';
+        btn.style.cursor = 'pointer';
+        btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.2)';
+        btn.style.zIndex = '9999';
+        btn.style.fontFamily = 'var(--baseFontFamily, sans-serif)';
+        btn.style.fontWeight = 'bold';
+        btn.onclick = openGraphModal;
+        
+        btn.onmouseenter = () => btn.style.transform = 'scale(1.05)';
+        btn.onmouseleave = () => btn.style.transform = 'scale(1)';
+        btn.style.transition = 'transform 0.2s';
+        
+        document.body.appendChild(btn);
+    }
 
     const modal = document.createElement('div');
     modal.id = 'graph-modal';

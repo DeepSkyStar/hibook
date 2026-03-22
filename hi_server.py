@@ -124,6 +124,35 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, f"Git error: {str(e)}")
             return
 
+        if path.startswith('/_api/file_at_commit'):
+            query = urllib.parse.parse_qs(parsed_url.query)
+            file_path = query.get('file', [''])[0].lstrip('/')
+            commit_hash = query.get('hash', [''])[0]
+            
+            if not file_path or not commit_hash or not os.path.exists(file_path):
+                self.send_error(404, "File not found or missing parameters")
+                return
+                
+            try:
+                cmd = ['git', 'show', f'{commit_hash}:{file_path}']
+                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                
+                self.send_response(200)
+                self.send_header("Content-type", "text/markdown; charset=utf-8")
+                self.send_header("Cache-Control", "public, max-age=31536000") # Immutable commit data
+                self.send_header("Content-Length", str(len(output)))
+                self.end_headers()
+                self.wfile.write(output)
+            except Exception as e:
+                # E.g. file didn't exist at that commit
+                msg = f"Failed to retrieve {file_path} at commit {commit_hash}".encode('utf-8')
+                self.send_response(404)
+                self.send_header("Content-type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+            return
+
         if path == '/_api/graph':
             root_dir = os.getcwd()
             graph = get_knowledge_graph(root_dir)
