@@ -150,6 +150,26 @@ function gitTimelinePlugin(hook, vm) {
             '<strong>⚠️ 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' + actionsHtml +
             '</div>' + rendered;
             
+         // 手动接管 Mermaid 渲染
+         if (window.mermaid) {
+             const mermaidBlocks = historyModalContent.querySelectorAll('code.language-mermaid');
+             mermaidBlocks.forEach(block => {
+                 const pre = block.parentElement;
+                 if (pre && pre.tagName === 'PRE') {
+                     const div = document.createElement('div');
+                     div.className = 'mermaid';
+                     // 使用 textContent 自动提取转义前的纯文本
+                     div.textContent = block.textContent; 
+                     pre.replaceWith(div);
+                 }
+             });
+             try {
+                window.mermaid.init(undefined, historyModalContent.querySelectorAll('.mermaid'));
+             } catch (e) {
+                console.error("Mermaid History Render Error:", e);
+             }
+         }
+            
          document.getElementById('btn-restore-version').onclick = () => {
              if (confirm("确定要回滚文件内容吗？")) {
                  fetch('/_api/save', {
