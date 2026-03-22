@@ -137,8 +137,17 @@
   }
 
   function syncRepository() {
-      const originalText = document.getElementById('btn-sync').innerHTML;
-      document.getElementById('btn-sync').innerHTML = '⏳ Syncing...';
+      const btn = document.getElementById('btn-sync');
+      const originalHTML = btn.innerHTML;
+      const originalTitle = btn.title;
+      
+      btn.innerHTML = '<span style="font-size: 1.2em;">⏳</span>';
+      btn.title = 'Syncing...';
+      
+      const restoreBtn = () => {
+          btn.innerHTML = originalHTML;
+          btn.title = originalTitle;
+      };
       
       fetch('/_api/sync', { method: 'POST' })
         .then(res => res.json())
@@ -161,28 +170,30 @@
                             window.location.reload();
                         } else {
                             alert("配置远程仓库或推送失败: " + d.error);
-                            document.getElementById('btn-sync').innerHTML = originalText;
+                            restoreBtn();
                         }
                     });
                 } else {
-                    document.getElementById('btn-sync').innerHTML = originalText;
+                    restoreBtn();
                 }
             } else if (res.conflict) {
                 const resolution = confirm('Sync Conflict Detected!\nYour local changes conflict with remote.\n\nClick OK/Yes to Keep Local Changes (Force Push)\nClick Cancel/No to Keep Remote Changes (Overwrite Local)');
                 resolveConflict(resolution ? 'local' : 'remote');
             } else {
                 alert('Sync Failed: ' + res.error);
-                document.getElementById('btn-sync').innerHTML = originalText;
+                restoreBtn();
             }
         })
         .catch(err => {
             alert('Network Error during Sync');
-            document.getElementById('btn-sync').innerHTML = originalText;
+            restoreBtn();
         });
   }
 
   function resolveConflict(strategy) {
-      document.getElementById('btn-sync').innerHTML = '⏳ Resolving...';
+      const btn = document.getElementById('btn-sync');
+      btn.innerHTML = '<span style="font-size: 1.2em;">⏳</span>';
+      btn.title = 'Resolving...';
       fetch('/_api/resolve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -195,7 +206,8 @@
               window.location.reload();
           } else {
               alert('Resolution Failed: ' + res.error);
-              document.getElementById('btn-sync').innerHTML = '🔄 Sync';
+              btn.innerHTML = '<span style="font-size: 1.2em;">🔄</span>';
+              btn.title = 'Sync';
           }
       });
   }
@@ -210,7 +222,8 @@
                 btn.style.boxShadow = '0 0 10px rgba(255,165,0,0.8)';
             }
             if (res.behind > 0) {
-                btn.innerHTML = `<span style="margin-right: 4px; font-size: 1.1em;">🔄</span><span style="font-size: 0.9em; font-weight: 500;">Pulll (${res.behind})</span>`;
+                btn.innerHTML = `<span style="font-size: 1.2em;">⬇️</span>`;
+                btn.title = `Pull (${res.behind} behind)`;
             }
         });
   }
