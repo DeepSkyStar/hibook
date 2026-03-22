@@ -25,13 +25,25 @@
 * **知识图谱 (Graph View)**:
     * 构建全局关系 `graph.json`。通过接入 ECharts 或 D3.js，在网页端提供星空节点网络图，直观展示知识孤岛与枢纽。
 
-## Phase 2: 打破只读壁垒 —— 交互式编辑 (Interactive Editor)
-*让 `hibook` 从一个阅读器进化为生产力工具。*
+## Phase 2: 分布式 Git 原生编辑 (Distributed Git-Centric Editor)
+*围绕 Git 重新设计交互逻辑，让 Hibook 彻底进化为分布式的个人知识生产力工具。*
 
-* **RESTful 写入层**: 为 Python 后端追加处理 `POST` / `PUT` 的存储逻辑。
-* **引入 WYSIWYG 引擎**: 
-    * 剥离单纯由 Docsify 承担的单向宣发形态。
-    * 接入如 CodeMirror 6（Obsidian 同款引擎）或者 Milkdown，实现浏览器端的双屏/所见即所得动态编辑。用户的按键直接经由 API 同步修改本地物理 `.md` 文件。
+* **底层知识主权与架构规约 (Data Sovereignty & Architecture)**：
+    * 坚持"零外部黑盒依赖"原则。
+    * 新建 `ARCH.md` 来锚定项目的依赖管理与演进规则。要求所有前端库（如 CodeMirror 编辑器核心，ECharts 等）必须手动 Vendor 到本地 `assets` 极简分发，杜绝 CDN 加载。
+* **Git 同步原语服务化 (Git Synchronization Mechanics)**: 
+    * 将编辑器触发的保存动作无缝下沉为 Git 的细粒度版本控制（`POST /_api/save` 执行底层的物理文件重写和 `git commit` 本地持化）。
+    * 追加原生云端同步 API接口（`POST /_api/sync` 执行 `pull --rebase` 与 `push`）。
+* **引入零依赖编辑器与冲突拦截 UI**: 
+    * 提供浏览器双端一致的互动式写作支持。
+    * 当 `_api/sync` 探知多端读写冲突时，提供最低沉浸损耗的 UI 机制：极简的双路选择（“强制覆写为本地版本” 或 “丢弃本地追平云端”）。
+
+## Phase 2.5: 历史版本高级控制 (Historical Version Controls)
+*在现有的 Git 时间线基础上，赋予用户针对单个变更的精确控制权，并直白区分本地与云端状态。*
+
+* **云端同步标识**: 在历史时间线上，通过对比 `@{u}..HEAD` 直观标记尚未 Push 到远程仓库的提交记录（Unsynced）。
+* **直接版本回充 (Restore Version)**: 允许在阅读历史版本时，拉取该版本的快照并覆盖当前文件，实现类似 Obsidian 的“恢复此版本”功能。
+* **撤销精准变更 (Undo Commit)**: 允许用户针对尚未 Push 的修改，执行精准的 `git revert`，在时间线留下撤销记录，同时逆转该次 Commit 引发的内容变化。
 
 ## Phase 3: 元数据与毫秒级全域搜索 (Metadata & Search)
 *大规模知识累积后的刚需是分类与检索。*

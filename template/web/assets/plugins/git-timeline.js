@@ -74,8 +74,11 @@ function gitTimelinePlugin(hook, vm) {
     hCloseBtn.style.right = '30px';
     hCloseBtn.style.color = '#fff';
     hCloseBtn.style.fontSize = '30px';
-    hCloseBtn.style.cursor = 'pointer';
-    hCloseBtn.onclick = () => historyModal.style.display = 'none';
+    hCloseBtn.onclick = () => {
+        historyModal.style.display = 'none';
+        const st = document.querySelector('.sidebar-toggle');
+        if (st) st.style.display = 'block';
+    };
     historyModal.appendChild(hCloseBtn);
     
     const hContainer = document.createElement('div');
@@ -106,8 +109,10 @@ function gitTimelinePlugin(hook, vm) {
     drawer.style.transform = 'translateX(0)';
   }
 
-  function viewHistoricalCommit(hash, filePath) {
+  function viewHistoricalCommit(hash, filePath, isSynced) {
     historyModal.style.display = 'flex';
+    const st = document.querySelector('.sidebar-toggle');
+    if (st) st.style.display = 'none';
     historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">加载历史版本 ' + hash + '...</h2>';
     
     fetch('/_api/file_at_commit?file=' + encodeURIComponent(filePath) + '&hash=' + hash)
@@ -116,7 +121,13 @@ function gitTimelinePlugin(hook, vm) {
          return res.text();
       })
       .then(text => {
-         // Try to use Marked if available, else fallback to pre tag
+         let actionsHtml = `<div style="margin-top: 10px; margin-bottom: 10px;">
+            <button id="btn-restore-version" style="padding: 6px 12px; cursor: pointer; background: #f39c12; color: white; border: none; border-radius: 4px; margin-right: 10px;">回滚到该次改动之前</button>`;
+         if (isSynced === 'false') {
+             actionsHtml += `<button id="btn-undo-commit" style="padding: 6px 12px; cursor: pointer; background: #e74c3c; color: white; border: none; border-radius: 4px;">抹掉该记录</button>`;
+         }
+         actionsHtml += `</div>`;
+         
          let rendered = '';
          if (window.marked && typeof window.marked === 'function') {
              rendered = window.marked(text);
@@ -130,8 +141,37 @@ function gitTimelinePlugin(hook, vm) {
          
          historyModalContent.innerHTML = 
             '<div style="background:#fffae6; color:#856404; padding:10px; margin-bottom:20px; border-radius:4px; border:1px solid #ffeeba;">' +
-            '<strong>⚠️ 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' +
+            '<strong>⚠️ 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' + actionsHtml +
             '</div>' + rendered;
+            
+         document.getElementById('btn-restore-version').onclick = () => {
+             if (confirm("确定要回滚文件内容吗？")) {
+                 fetch('/_api/save', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ file: filePath, content: text, message: `回滚 ${filePath} 至历史状态 ${hash}` })
+                 }).then(r => r.json()).then(res => {
+                     if (res.success) { alert("回滚成功！"); window.location.reload(); }
+                     else { alert("操作失败: " + res.error); }
+                 });
+             }
+         };
+         
+         let undoBtn = document.getElementById('btn-undo-commit');
+         if (undoBtn) {
+             undoBtn.onclick = () => {
+                 if (confirm("确定要彻底抹掉该条历史记录吗？\n（危险操作：此操作类似 Reset，将从本地历史记录中彻底删除该节点，若与其他历史存在依赖冲突将自动终止该操作。）")) {
+                     fetch('/_api/drop_commit', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ hash: hash })
+                     }).then(r => r.json()).then(res => {
+                         if (res.success) { alert("抹除该记录成功！"); window.location.reload(); }
+                         else { alert("操作失败: " + res.error); }
+                     });
+                 }
+             };
+         }
       })
       .catch(err => {
          historyModalContent.innerHTML = '<h2 style="text-align:center;color:red;margin-top:20vh;">无法加载该历史版本</h2><p style="text-align:center;">' + err.message + '</p>';
@@ -165,10 +205,11 @@ function gitTimelinePlugin(hook, vm) {
 
         var listHtml = '<ul style="list-style:none; padding-left:0; border-left: 2px solid #eaecef; margin-left: 10px; margin-bottom: 0;">';
         history.forEach(function(commit) {
-          listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" style="position: relative; margin-bottom: 20px; padding-left: 20px; cursor: pointer;">' +
+          let unsyncedTag = !commit.is_synced ? '<span style="color:#e67e22; font-weight:bold; margin-left:5px;">(Unsynced)</span>' : '';
+          listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" data-synced="' + commit.is_synced + '" style="position: relative; margin-bottom: 20px; padding-left: 20px; cursor: pointer;">' +
                       '<div style="position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #42b983; border: 2px solid #fff; box-shadow: 0 0 0 1px #eaecef;"></div>' +
                       '<div style="font-size: 0.85em; color: #888; margin-bottom: 6px;">' +
-                      '<strong style="color: #555;">' + commit.date + '</strong> • ' + commit.author + ' ' +
+                      '<strong style="color: #555;">' + commit.date + '</strong> • ' + commit.author + unsyncedTag + ' ' +
                       '<code style="background: #f1f1f1; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; margin-left: 5px; color:#333;">' + commit.hash + '</code>' +
                       '</div>' +
                       '<div style="color: #444; font-size: 0.95em; line-height: 1.5;">' + commit.message + '</div>' +
@@ -182,7 +223,7 @@ function gitTimelinePlugin(hook, vm) {
         nodes.forEach(node => {
             node.onmouseenter = () => node.style.backgroundColor = 'rgba(66, 185, 131, 0.1)';
             node.onmouseleave = () => node.style.backgroundColor = 'transparent';
-            node.onclick = () => viewHistoricalCommit(node.getAttribute('data-hash'), currentFile);
+            node.onclick = () => viewHistoricalCommit(node.getAttribute('data-hash'), currentFile, node.getAttribute('data-synced'));
         });
       })
       .catch(function(err) {

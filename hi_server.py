@@ -101,6 +101,15 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 cmd = ['git', 'log', '--pretty=format:%h|%an|%ad|%s', '--date=short', '--', file_path]
                 output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+                
+                # Fetch unsynced hashes safely
+                unsynced = set()
+                try:
+                    unsynced_out = subprocess.check_output(['git', 'log', '@{u}..HEAD', '--format=%h'], stderr=subprocess.DEVNULL, text=True)
+                    unsynced = set(unsynced_out.strip().split('\n'))
+                except Exception:
+                    pass
+                    
                 history = []
                 for line in output.strip().split('\n'):
                     if line:
@@ -110,7 +119,8 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                                 'hash': parts[0],
                                 'author': parts[1],
                                 'date': parts[2],
-                                'message': parts[3]
+                                'message': parts[3],
+                                'is_synced': parts[0] not in unsynced
                             })
                 
                 encoded = json.dumps(history).encode('utf-8')
@@ -183,6 +193,46 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(encoded)
             return
+            
+        if path == '/_api/status':
+            try:
+                subprocess.run(['git', 'fetch'], capture_output=True)
+                status_res = subprocess.run(['git', 'status', '-s', '-b'], capture_output=True, text=True)
+                stdout = status_res.stdout.strip()
+                lines = stdout.split('\n')
+                branch_info = lines[0] if lines else ""
+                
+                conflict = 'UU ' in stdout
+                ahead = 0
+                behind = 0
+                
+                if 'ahead' in branch_info:
+                    ahead_m = re.search(r'ahead (\d+)', branch_info)
+                    if ahead_m: ahead = int(ahead_m.group(1))
+                if 'behind' in branch_info:
+                    behind_m = re.search(r'behind (\d+)', branch_info)
+                    if behind_m: behind = int(behind_m.group(1))
+                
+                # Check if there are any modified files (M) or untracked (?)
+                dirty = len([l for l in lines[1:] if l.strip()]) > 0
+                    
+                resp = {
+                    "conflict": conflict,
+                    "ahead": ahead,
+                    "behind": behind,
+                    "dirty": dirty,
+                    "branch_info": branch_info
+                }
+                encoded = json.dumps(resp).encode('utf-8')
+                self.send_response(200)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+            except Exception as e:
+                self.send_error(500, str(e))
+            return
 
         path_no_query = self.path.split('?')[0]
         if path_no_query.endswith('.md'):
@@ -220,6 +270,96 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(encoded)
                 return
         super().do_GET()
+
+    def do_POST(self):
+        parsed_url = urllib.parse.urlparse(self.path)
+        path = parsed_url.path
+        
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length) if content_length > 0 else b'{}'
+        try:
+            req = json.loads(post_data.decode('utf-8'))
+        except:
+            req = {}
+            
+        def send_json(data, status=200):
+            encoded = json.dumps(data).encode('utf-8')
+            self.send_response(status)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        if path == '/_api/save':
+            file_path = req.get('file', '').lstrip('/')
+            content = req.get('content', '')
+            custom_message = req.get('message', '').strip()
+            if not file_path:
+                return send_json({"success": False, "error": "Missing file"}, 400)
+                
+            try:
+                # Write to disk
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                # Git commit
+                subprocess.run(['git', 'add', file_path], check=True)
+                msg = custom_message if custom_message else f"Manual-save: {file_path}"
+                subprocess.run(['git', 'commit', '-m', msg], capture_output=True)
+                # Get the new hash
+                out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], text=True)
+                return send_json({"success": True, "hash": out.strip()})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
+        if path == '/_api/sync':
+            # Perform pull --no-rebase
+            pull_res = subprocess.run(['git', 'pull', '--no-rebase'], capture_output=True, text=True)
+            if pull_res.returncode != 0:
+                # If conflict, abort and return conflict state
+                if 'conflict' in pull_res.stdout.lower() or 'conflict' in pull_res.stderr.lower() or 'Automatic merge failed' in pull_res.stdout:
+                    subprocess.run(['git', 'merge', '--abort'])
+                    return send_json({"success": False, "conflict": True, "details": pull_res.stdout + pull_res.stderr})
+                # Other error (e.g. no upstream, or uncommitted changes)
+                return send_json({"success": False, "conflict": False, "error": pull_res.stderr or pull_res.stdout})
+                
+            # Pull succeeded (or already up to date), now push
+            push_res = subprocess.run(['git', 'push'], capture_output=True, text=True)
+            if push_res.returncode != 0:
+                return send_json({"success": False, "error": "Failed to push: " + push_res.stderr})
+                
+            return send_json({"success": True})
+            
+        if path == '/_api/resolve':
+            strategy = req.get('strategy') # 'local' or 'remote'
+            if strategy not in ['local', 'remote']:
+                return send_json({"success": False, "error": "Invalid strategy"}, 400)
+                
+            strat_flag = '-Xours' if strategy == 'local' else '-Xtheirs'
+            try:
+                # Attempt to pull and auto-resolve using the strategy
+                res = subprocess.run(['git', 'pull', '--no-rebase', '-s', 'recursive', strat_flag], capture_output=True, text=True)
+                if res.returncode != 0:
+                     return send_json({"success": False, "error": "Resolution failed: " + res.stderr})
+                subprocess.run(['git', 'push'], check=True)
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
+        if path == '/_api/drop_commit':
+            commit_hash = req.get('hash', '')
+            if not commit_hash:
+                return send_json({"success": False, "error": "Missing commit hash"}, 400)
+            try:
+                res = subprocess.run(['git', 'rebase', '--onto', commit_hash + '^', commit_hash], capture_output=True, text=True)
+                if res.returncode != 0:
+                    subprocess.run(['git', 'rebase', '--abort'], capture_output=True)
+                    return send_json({"success": False, "error": "无法彻底抹除该记录由于存在冲突。请手动解决或使用回滚操作。\n详情: " + res.stderr + res.stdout})
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+        
+        self.send_error(404, "API not found")
 
 
 def cmd_web(args):
