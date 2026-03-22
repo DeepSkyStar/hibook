@@ -9,8 +9,6 @@
     const wrap = document.createElement('div');
     wrap.id = 'hibook-toolbar-wrap';
     wrap.style.position = 'fixed';
-    wrap.style.top = '15px';
-    wrap.style.right = '20px';
     wrap.style.display = 'flex';
     wrap.style.alignItems = 'center';
     wrap.style.backgroundColor = '#fff';

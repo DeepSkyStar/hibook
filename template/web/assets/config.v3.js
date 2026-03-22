@@ -1,5 +1,5 @@
 window.$docsify = {
-  name: 'Hibook Library',
+  name: 'Hibook',
   repo: '',
   homepage: 'README.md',
   loadSidebar: 'SUMMARY.md',
@@ -31,6 +31,29 @@ window.$docsify = {
     }
   },
   plugins: [
+    // Dynamic Title Bootstrapper: Fetches Root README.md to define the KB Identity
+    function(hook, vm) {
+        hook.ready(function() {
+            fetch('README.md')
+                .then(r => r.text())
+                .then(text => {
+                    const match = text.match(/^#\s+(.+)$/m);
+                    if (match && match[1]) {
+                        const title = match[1].trim();
+                        
+                        // Update Browser Tab
+                        document.title = title;
+                        
+                        // Update Docsify sidebar identity
+                        const appNameEl = document.querySelector('.app-name-link');
+                        if (appNameEl) {
+                            appNameEl.innerText = title;
+                        }
+                    }
+                })
+                .catch(err => console.error("Failed to sync title from README:", err));
+        });
+    },
     // Sidebar Resizer & Scroll Memory
     function(hook, vm) {
       hook.mounted(function() {
