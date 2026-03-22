@@ -16,7 +16,8 @@ function gitTimelinePlugin(hook, vm) {
     drawer.style.height = '100vh';
     drawer.style.backgroundColor = '#fff';
     drawer.style.boxShadow = '-5px 0 15px rgba(0,0,0,0.1)';
-    drawer.style.zIndex = '10000';
+    // Applies to the structured drawer layer from custom.css
+    drawer.style.zIndex = 'var(--z-layer-drawer)';
     drawer.style.transform = 'translateX(100%)';
     drawer.style.transition = 'transform 0.3s ease-in-out';
     drawer.style.overflowY = 'auto';
@@ -62,7 +63,7 @@ function gitTimelinePlugin(hook, vm) {
     historyModal.style.width = '100vw';
     historyModal.style.height = '100vh';
     historyModal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-    historyModal.style.zIndex = '10001';
+    historyModal.style.zIndex = 'var(--z-layer-modal)';
     historyModal.style.display = 'none';
     historyModal.style.justifyContent = 'center';
     historyModal.style.alignItems = 'center';
@@ -76,8 +77,6 @@ function gitTimelinePlugin(hook, vm) {
     hCloseBtn.style.fontSize = '30px';
     hCloseBtn.onclick = () => {
         historyModal.style.display = 'none';
-        const st = document.querySelector('.sidebar-toggle');
-        if (st) st.style.display = 'block';
     };
     historyModal.appendChild(hCloseBtn);
     
@@ -111,8 +110,6 @@ function gitTimelinePlugin(hook, vm) {
 
   function viewHistoricalCommit(hash, filePath, isSynced) {
     historyModal.style.display = 'flex';
-    const st = document.querySelector('.sidebar-toggle');
-    if (st) st.style.display = 'none';
     historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">加载历史版本 ' + hash + '...</h2>';
     
     fetch('/_api/file_at_commit?file=' + encodeURIComponent(filePath) + '&hash=' + hash)

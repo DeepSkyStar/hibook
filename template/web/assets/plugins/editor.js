@@ -11,12 +11,14 @@
     const container = document.createElement('div');
     container.id = 'hibook-editor-container';
     container.style.position = 'fixed';
+    container.style.position = 'fixed';
     container.style.top = '0';
     container.style.left = '0';
     container.style.width = '100vw';
     container.style.height = '100vh';
     container.style.backgroundColor = 'var(--theme-bg, #fff)';
-    container.style.zIndex = '9000';
+    // Appends to the generalized modal layer from custom.css
+    container.style.zIndex = 'var(--z-layer-modal)';
     container.style.display = 'none';
     container.style.flexDirection = 'column';
     
@@ -103,8 +105,6 @@
         if (article) article.style.display = 'none';
         const tb = document.getElementById('hibook-toolbar');
         if (tb) tb.style.display = 'none';
-        const st = document.querySelector('.sidebar-toggle');
-        if (st) st.style.display = 'none';
         container.style.display = 'flex';
         document.getElementById('hibook-editor-title').innerHTML = `Editing: ${filepath}`;
         
@@ -129,8 +129,6 @@
         if (article) article.style.display = 'block';
         const tb = document.getElementById('hibook-toolbar');
         if (tb) tb.style.display = 'flex';
-        const st = document.querySelector('.sidebar-toggle');
-        if (st) st.style.display = 'block';
         container.style.display = 'none';
         // Force docsify to reload the page to render latest markdown
         window.location.reload();

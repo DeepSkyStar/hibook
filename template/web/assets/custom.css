@@ -8,9 +8,9 @@
     text-align: right !important; /* 改为右对齐 */
   }
   
-  /* 调整内容区域的顶部内边距 */
+  /* 调整内容区域的顶部内边距，为了给右上角悬浮的 Toolbar 留出充足空间避免遮挡标题 */
   .content {
-    padding-top: 10px !important;
+    padding-top: 60px !important;
   }
 
   /* 确保导航栏列表项在移动端也能正常显示 */
@@ -35,9 +35,20 @@
     padding-left: 25px !important;
 }
 
-/* --- 可拖拽侧边栏 (Resizable Sidebar) --- */
+/* --- Hibook Z-Index Layer System (Portal Architecture) --- */
+/*
+ * We strictly define layers here to avoid arbitrary z-index conflicts.
+ * Layer 1: Base Docsify (Content, Sidebar)
+ * Layer 2: Fixed UI (Toolbar, Sidebar Resizer)
+ * Layer 3: Overlay Drawers (Git Timeline, Search Palette)
+ * Layer 4: Fullscreen Modals (Editor, History Snapshots)
+ */
 :root {
     --sidebar-width: 300px; /* 默认宽度 */
+    --z-layer-base: 1;
+    --z-layer-fixed-ui: 100;
+    --z-layer-drawer: 1000;
+    --z-layer-modal: 2000;
 }
 
 /* 仅在桌面端应用拖拽逻辑 */
@@ -62,7 +73,6 @@
         display: none;
     }
 
-    /* 拖拽把手样式 */
     .sidebar-resizer {
         position: fixed;
         width: 8px; /* 稍微窄一点，但响应范围大 */
@@ -71,7 +81,7 @@
         left: var(--sidebar-width, 300px); /* 增加默认值 fallback */
         margin-left: -4px; /* 居中 */
         cursor: col-resize;
-        z-index: 99999; /* 足够大 */
+        z-index: var(--z-layer-fixed-ui); /* 遵守架构层级设计，不再使用魔法大数字 */
         transition: background-color 0.2s;
         /* 辅助对齐线 */
         border-left: 1px solid rgba(0,0,0,0.05); 

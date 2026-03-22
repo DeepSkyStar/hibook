@@ -12,7 +12,7 @@
     toolbar.style.right = '20px';
     toolbar.style.display = 'flex';
     toolbar.style.gap = '10px';
-    toolbar.style.zIndex = '9999';
+    toolbar.style.zIndex = 'var(--z-layer-fixed-ui)';
     document.body.appendChild(toolbar);
   }
 
