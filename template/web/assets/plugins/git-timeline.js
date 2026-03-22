@@ -105,6 +105,10 @@ function gitTimelinePlugin(hook, vm) {
 
   function openTimelineDrawer() {
     if (!drawer) initTimelineUI();
+    const title = drawer.querySelector('h3');
+    if (title && title.innerHTML.includes('全局')) {
+        if (window.loadPageHistory) window.loadPageHistory();
+    }
     drawer.style.transform = 'translateX(0)';
   }
 
@@ -182,14 +186,20 @@ function gitTimelinePlugin(hook, vm) {
       }
   });
 
-  hook.doneEach(function() {
-    var container = document.getElementById('git-timeline-content');
-    if (!container || !vm.route.file) return;
-    
-    const currentFile = decodeURIComponent(vm.route.file);
-    container.innerHTML = '<span style="color:#999">加载中...</span>';
+  let currentVmRouteFile = null;
 
-    fetch('/_api/history?file=' + encodeURIComponent(currentFile))
+  function loadPageHistory() {
+      if (!currentVmRouteFile) return;
+      var container = document.getElementById('git-timeline-content');
+      if (!container) return;
+      
+      const title = drawer.querySelector('h3');
+      if(title) title.innerHTML = '📄 页面变更时间线';
+      
+      const currentFile = decodeURIComponent(currentVmRouteFile);
+      container.innerHTML = '<span style="color:#999">加载中...</span>';
+
+      fetch('/_api/history?file=' + encodeURIComponent(currentFile))
       .then(function(response) {
         if (!response.ok) throw new Error('API off or file not tracked');
         return response.json();
@@ -226,6 +236,14 @@ function gitTimelinePlugin(hook, vm) {
       .catch(function(err) {
         container.innerHTML = '<span style="color:#999; font-size: 0.9em;">无法获取时间线或无记录。</span>';
       });
+  }
+
+  hook.doneEach(function() {
+      if (vm.route.file) {
+          currentVmRouteFile = vm.route.file;
+          // Pre-load if drawer is open to keep it synced, but we can just always pre-load
+          loadPageHistory();
+      }
   });
 
   function loadGlobalHistory() {
@@ -336,6 +354,7 @@ function gitTimelinePlugin(hook, vm) {
   // Expose methods globally
   window.openTimelineDrawer = openTimelineDrawer;
   window.loadGlobalHistory = loadGlobalHistory;
+  window.loadPageHistory = loadPageHistory;
 }
 
 window.$docsify = window.$docsify || {};
