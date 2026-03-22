@@ -186,7 +186,7 @@ function gitTimelinePlugin(hook, vm) {
     var container = document.getElementById('git-timeline-content');
     if (!container || !vm.route.file) return;
     
-    const currentFile = vm.route.file;
+    const currentFile = decodeURIComponent(vm.route.file);
     container.innerHTML = '<span style="color:#999">加载中...</span>';
 
     fetch('/_api/history?file=' + encodeURIComponent(currentFile))

@@ -51,6 +51,15 @@ def __create(args):
     if os.path.exists(src_rule):
         shutil.copy2(src_rule, dest_rule)
         
+    try:
+        import subprocess
+        subprocess.run(['git', 'init'], cwd=target_dir, check=True, capture_output=True)
+        subprocess.run(['git', 'add', '.'], cwd=target_dir, check=True, capture_output=True)
+        subprocess.run(['git', 'commit', '-m', 'Initial commit: Create hibook structure'], cwd=target_dir, check=True, capture_output=True)
+        HiLog.info(f"Initialized git repository in '{name}'")
+    except Exception as e:
+        HiLog.warning(f"Failed to initialize git repository: {e}")
+        
     HiLog.info(f"Successfully created new hibook project in '{name}'")
     HiLog.info(f"Run `cd {name}` and then `hibook web` to view it.")
     pass

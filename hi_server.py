@@ -449,7 +449,31 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
                 
+        if path == '/_api/save_all':
+            custom_msg = req.get('message', 'Save external changes').strip()
+            if not custom_msg: custom_msg = 'Save external changes'
+            try:
+                subprocess.run(['git', 'add', '.'], check=True)
+                subprocess.run(['git', 'commit', '-m', custom_msg], capture_output=True)
+                out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], text=True)
+                return send_json({"success": True, "hash": out.strip()})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
+        if path == '/_api/discard_all':
+            try:
+                subprocess.run(['git', 'reset', '--hard'], check=True, capture_output=True)
+                subprocess.run(['git', 'clean', '-fd'], check=True, capture_output=True)
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
         if path == '/_api/sync':
+            # Check for remote first
+            remote_check = subprocess.run(['git', 'remote', '-v'], capture_output=True, text=True)
+            if not remote_check.stdout.strip():
+                return send_json({"success": False, "no_remote": True, "error": "No remote configured"})
+                
             # Perform pull --no-rebase
             pull_res = subprocess.run(['git', 'pull', '--no-rebase'], capture_output=True, text=True)
             if pull_res.returncode != 0:
@@ -467,6 +491,27 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 
             return send_json({"success": True})
             
+        if path == '/_api/set_remote':
+            remote_url = req.get('remote', '').strip()
+            if not remote_url:
+                return send_json({"success": False, "error": "Missing remote URL"}, 400)
+            try:
+                try:
+                    subprocess.run(['git', 'remote', 'add', 'origin', remote_url], check=True, capture_output=True, text=True)
+                except subprocess.CalledProcessError:
+                    subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], check=True, capture_output=True, text=True)
+                
+                curr_branch = subprocess.check_output(['git', 'branch', '--show-current'], text=True).strip()
+                if not curr_branch: curr_branch = 'main'
+                
+                # Setup upstream and push
+                push_res = subprocess.run(['git', 'push', '-u', 'origin', curr_branch], capture_output=True, text=True)
+                if push_res.returncode != 0:
+                    return send_json({"success": False, "error": f"Failed to push to new remote: {push_res.stderr}"})
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
         if path == '/_api/resolve':
             strategy = req.get('strategy') # 'local' or 'remote'
             if strategy not in ['local', 'remote']:

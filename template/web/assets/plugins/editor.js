@@ -44,9 +44,10 @@
     saveBtn.style.marginRight = '10px';
     saveBtn.style.cursor = 'pointer';
     saveBtn.onclick = () => {
-        const msg = prompt("Enter commit message:", "Update " + window.$docsify.route.file);
+        const decodedFile = decodeURIComponent(window.$docsify.route.file);
+        const msg = prompt("Enter commit message:", "Update " + decodedFile);
         if (msg !== null) {
-            saveContent(easyMdeInstance.value(), window.$docsify.route.file, msg);
+            saveContent(easyMdeInstance.value(), decodedFile, msg);
         }
     };
     actions.appendChild(saveBtn);
@@ -94,7 +95,7 @@
   function toggleEditMode() {
     const container = document.getElementById('hibook-editor-container');
     const article = document.querySelector('article.markdown-section') || document.querySelector('.markdown-section');
-    const filepath = window.$docsify.route.file;
+    const filepath = decodeURIComponent(window.$docsify.route.file);
     
     if (!container) initEditorUI();
     
@@ -109,7 +110,7 @@
         document.getElementById('hibook-editor-title').innerHTML = `Editing: ${filepath}`;
         
         // Fetch raw markdown
-        fetch('/' + filepath)
+        fetch('/' + encodeURI(filepath))
             .then(res => res.text())
             .then(text => {
                 if (!easyMdeInstance) {
@@ -145,6 +146,27 @@
             if (res.success) {
                 alert('Sync Successful!');
                 window.location.reload();
+            } else if (res.no_remote) {
+                let remoteUrl = prompt("未检测到远程仓库配置。\n请输入完整的 Git 远程仓库地址 (例如 git@github.com:user/repo.git)\n若配置成功将自动重试合并与推送：");
+                if (remoteUrl && remoteUrl.trim()) {
+                    fetch('/_api/set_remote', {
+                        method: 'POST',
+                        body: JSON.stringify({ remote: remoteUrl.trim() }),
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.success) {
+                            alert("配置成功！并且已完成初始化推送和上游追踪。\n以后的改动可以直接点击 Sync 同步！");
+                            window.location.reload();
+                        } else {
+                            alert("配置远程仓库或推送失败: " + d.error);
+                            document.getElementById('btn-sync').innerHTML = originalText;
+                        }
+                    });
+                } else {
+                    document.getElementById('btn-sync').innerHTML = originalText;
+                }
             } else if (res.conflict) {
                 const resolution = confirm('Sync Conflict Detected!\nYour local changes conflict with remote.\n\nClick OK/Yes to Keep Local Changes (Force Push)\nClick Cancel/No to Keep Remote Changes (Overwrite Local)');
                 resolveConflict(resolution ? 'local' : 'remote');

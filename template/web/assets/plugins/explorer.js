@@ -56,7 +56,7 @@
                 const details = document.createElement('details');
                 
                 // Check if active file is inside this folder to auto-expand
-                let currentPath = window.location.hash.replace('#/', '');
+                let currentPath = decodeURIComponent(window.location.hash.replace('#/', ''));
                 if (currentPath && typeof currentPath === 'string' && currentPath.startsWith(item.path + '/')) {
                     details.open = true;
                 }
@@ -209,7 +209,7 @@
                 loadTree(); // Reload tree
                 
                 // If the moved item is the currently viewed file, update URL
-                let currentHash = window.location.hash.replace('#/', '');
+                let currentHash = decodeURIComponent(window.location.hash.replace('#/', ''));
                 let oldNoExt = oldPath.endsWith('.md') ? oldPath.slice(0, -3) : oldPath;
                 if (currentHash === oldNoExt) {
                     let newNoExt = newPath.endsWith('.md') ? newPath.slice(0, -3) : newPath;
@@ -365,38 +365,79 @@
         globalRow.style.borderBottom = '1px solid #eaecef';
         
         const btnSave = document.createElement('button');
-        btnSave.innerHTML = '💾 全局保存';
+        btnSave.innerHTML = '✅ 保存外部更改';
+        
+        const btnDiscard = document.createElement('button');
+        btnDiscard.innerHTML = '🗑️ 抹掉外部更改';
+        
         const btnHistory = document.createElement('button');
         btnHistory.innerHTML = '🕰️ 全局历史';
         
-        [btnSave, btnHistory].forEach(btn => {
+        const hasUncommitted = Object.keys(gitStatusData || {}).length > 0;
+        
+        [btnSave, btnDiscard, btnHistory].forEach(btn => {
              btn.style.flex = '1';
              btn.style.border = '1px solid #dfe2e5';
              btn.style.background = '#f8f9fa';
              btn.style.padding = '6px';
              btn.style.borderRadius = '4px';
              btn.style.cursor = 'pointer';
-             btn.style.fontSize = '13px';
+             btn.style.fontSize = '12px';
         });
         
+        if (!hasUncommitted) {
+             btnSave.style.display = 'none';
+             btnDiscard.style.display = 'none';
+        } else {
+             btnSave.style.backgroundColor = '#d4edda';
+             btnSave.style.borderColor = '#c3e6cb';
+             btnSave.style.color = '#155724';
+             
+             btnDiscard.style.backgroundColor = '#f8d7da';
+             btnDiscard.style.borderColor = '#f5c6cb';
+             btnDiscard.style.color = '#721c24';
+        }
+        
         btnSave.onclick = () => {
+             let msg = prompt("确认要将所有外部文件改动提交入库吗？\n请输入 Submit Message:", "Save external changes");
+             if (msg === null) return;
+             
+             btnSave.style.display = 'none';
+             btnDiscard.style.display = 'none';
              btnSave.innerText = '⏳ 正在保存...';
-             fetch('/_api/save', { method: 'POST', body: JSON.stringify({path: window.location.hash.replace('#/', '') + '.md'}), headers: {'Content-Type':'application/json'}})
+             fetch('/_api/save_all', { method: 'POST', body: JSON.stringify({ message: msg }), headers: {'Content-Type':'application/json'}})
              .then(res => res.json()).then(data => {
-                  btnSave.innerText = '💾 全局保存';
+                  btnSave.innerText = '✅ 保存外部更改';
                   if(data.success) {
-                      alert("全库已成功 Commit，您可以随时 Sync。");
                       loadTree(); // Refresh git status visually
                   }
                   else alert("Save failed: " + data.error);
              });
         };
+        
+        btnDiscard.onclick = () => {
+             if (!confirm("⚠️ 危险警告！\n\n所有没有登记进版本库的新文件、通过外部软件修改的内容，都将彻底丢失，不可恢复！\n确定要抹掉它们吗？")) return;
+             
+             btnSave.style.display = 'none';
+             btnDiscard.style.display = 'none';
+             fetch('/_api/discard_all', { method: 'POST' })
+             .then(res => res.json()).then(data => {
+                  if(data.success) {
+                      // Reload the entire window to ensure the current markdown file view is refreshed with the clean git state
+                      window.location.reload();
+                  } else {
+                      alert("Discard failed: " + data.error);
+                  }
+             });
+        };
+        
         btnHistory.onclick = () => {
             // Leverage git-timeline.js global modal logic
             if (window.loadGlobalHistory) window.loadGlobalHistory(); 
             else alert("Timeline 插件未加载或版本过老。");
         };
         globalRow.appendChild(btnSave);
+        globalRow.appendChild(btnDiscard);
         globalRow.appendChild(btnHistory);
         container.appendChild(globalRow);
         
@@ -422,7 +463,7 @@
         
         hook.doneEach(function() {
              // Highlight current active file in tree
-             let current = window.location.hash.replace('#/', '');
+             let current = decodeURIComponent(window.location.hash.replace('#/', ''));
              if (!current) current = 'README';
              
              document.querySelectorAll('.explorer-item.active').forEach(el => {
