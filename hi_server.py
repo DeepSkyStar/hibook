@@ -32,7 +32,7 @@ def get_knowledge_graph(root_dir):
                 path = os.path.relpath(os.path.join(root, f), root_dir)
                 file_contents[path] = os.path.join(root, f)
                 
-    nodes = [{"id": path, "label": os.path.basename(path)[:-3]} for path in file_contents.keys()]
+    nodes = []
     
     basename_to_path = {}
     for path in file_contents.keys():
@@ -45,6 +45,11 @@ def get_knowledge_graph(root_dir):
         try:
             with open(full_path, 'r', encoding='utf-8') as f:
                 content = f.read()
+            
+            # Extract title from the first heading 1
+            title_match = re.search(r'^#\s+(.*?)$', content, re.MULTILINE)
+            label = title_match.group(1).strip() if title_match else os.path.basename(path)[:-3]
+            nodes.append({"id": path, "label": label})
                 
             for match in re.finditer(r'\[\[(.*?)\]\]', content):
                 wl = match.group(1)
@@ -69,6 +74,8 @@ def get_knowledge_graph(root_dir):
                      edges.append({"source": path, "target": target_path})
                      backlinks[target_path].append({"source": path, "type": "link", "text": text, "snippet": snippet})
         except Exception:
+            # Fallback for unreadable files
+            nodes.append({"id": path, "label": os.path.basename(path)[:-3]})
             pass
             
     _graph_cache = {"nodes": nodes, "edges": edges, "backlinks": backlinks}
