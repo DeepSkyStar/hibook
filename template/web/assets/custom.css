@@ -1,0 +1,87 @@
+/* 移动端适配修复 */
+@media screen and (max-width: 768px) {
+  /* 让导航栏不再绝对定位，而是占据文档流空间，避免重叠 */
+  .app-nav {
+    position: static !important;
+    margin: 0 !important;
+    padding: 10px 15px !important; /* 增加左右内边距 */
+    text-align: right !important; /* 改为右对齐 */
+  }
+  
+  /* 调整内容区域的顶部内边距 */
+  .content {
+    padding-top: 10px !important;
+  }
+
+  /* 确保导航栏列表项在移动端也能正常显示 */
+  .app-nav li {
+    display: inline-block;
+    margin: 0 5px;
+  }
+}
+
+/* 侧边栏箭头放大优化 */
+.sidebar-nav ul:not(.app-sub-sidebar) > li:not(.file)::before {
+    width: 10px !important;
+    height: 10px !important;
+    border-right-width: 2px !important;
+    border-bottom-width: 2px !important;
+    left: -20px !important; /* 向左移，避免遮挡文字 */
+    top: 10px !important;   /* 垂直居中微调 */
+}
+
+/* 增加左侧缩进，给大箭头腾出空间 */
+.sidebar ul {
+    padding-left: 25px !important;
+}
+
+/* --- 可拖拽侧边栏 (Resizable Sidebar) --- */
+:root {
+    --sidebar-width: 300px; /* 默认宽度 */
+}
+
+/* 仅在桌面端应用拖拽逻辑 */
+@media screen and (min-width: 769px) {
+    /* 覆盖 Docsify 默认的固定宽度 */
+    body.sticky .sidebar,
+    .sidebar {
+        width: var(--sidebar-width) !important;
+    }
+    
+    /* 覆盖内容区域的左边距 */
+    body.sticky .content,
+    .content {
+        left: var(--sidebar-width) !important;
+    }
+
+    /* 当侧边栏关闭时，内容占满，同时隐藏拖拽条 */
+    body.close .content {
+        left: 0 !important;
+    }
+    body.close .sidebar-resizer {
+        display: none;
+    }
+
+    /* 拖拽把手样式 */
+    .sidebar-resizer {
+        position: fixed;
+        width: 8px; /* 稍微窄一点，但响应范围大 */
+        top: 0;
+        bottom: 0;
+        left: var(--sidebar-width, 300px); /* 增加默认值 fallback */
+        margin-left: -4px; /* 居中 */
+        cursor: col-resize;
+        z-index: 99999; /* 足够大 */
+        transition: background-color 0.2s;
+        /* 辅助对齐线 */
+        border-left: 1px solid rgba(0,0,0,0.05); 
+    }
+
+    .sidebar-resizer:hover,
+    .sidebar-resizer.active {
+        background-color: #42b983; /* 绿色高亮，让用户明确看到 */
+        opacity: 0.8;
+        width: 12px; /* 悬停时变宽方便抓住 */
+        margin-left: -6px;
+    }
+}
