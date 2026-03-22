@@ -8,13 +8,146 @@
             setTimeout(injectTabs, 100);
             return;
         }
-
-        // Wait for native sidebar-nav to spin up
+        
         const nativeNav = sidebar.querySelector('.sidebar-nav');
         if (!nativeNav) {
             setTimeout(injectTabs, 100);
             return;
         }
+
+        function transformDocsifyTOC() {
+            // Docsify over-writes nativeNav.innerHTML on each navigation.
+            // When it does, it drops a fresh <ul>. 
+            const rootUL = nativeNav.querySelector(':scope > ul') || nativeNav.querySelector('ul');
+            if (!rootUL) return;
+
+            function convertUL(ul, depth) {
+                ul.style.listStyleType = 'none';
+                ul.style.paddingLeft = depth === 0 ? '0' : '15px';
+                ul.style.margin = '0';
+                
+                let anyActive = false;
+                
+                // Clone array to safely modify DOM while iterating
+                Array.from(ul.children).forEach(li => {
+                    if (li.tagName !== 'LI') return;
+                    
+                    const isDirectlyActive = li.classList.contains('active');
+                    
+                    let link = li.querySelector(':scope > a') || li.querySelector(':scope > p > a') || li.querySelector(':scope > p') || li.querySelector(':scope > span');
+                    let subUL = li.querySelector(':scope > ul');
+                    
+                    let name = link ? link.innerText : (li.childNodes[0] ? li.childNodes[0].textContent.trim() : '');
+                    let href = link && link.tagName === 'A' ? link.getAttribute('href') : null;
+                    
+                    li.style.margin = '2px 0';
+                    li.style.position = 'relative';
+                    
+                    // Remove old Docsify tags but keep the subUL
+                    const oldElements = Array.from(li.children).filter(el => el.tagName !== 'UL');
+                    oldElements.forEach(el => li.removeChild(el));
+                    
+                    if (subUL) {
+                        const details = document.createElement('details');
+                        
+                        const summary = document.createElement('summary');
+                        summary.className = 'explorer-item';
+                        if (isDirectlyActive) {
+                            summary.classList.add('active');
+                            anyActive = true;
+                        }
+                        
+                        summary.style.display = 'flex';
+                        summary.style.alignItems = 'center';
+                        summary.style.padding = '4px 8px';
+                        summary.style.cursor = 'pointer';
+                        summary.style.borderRadius = '4px';
+                        summary.style.listStyle = 'none';
+                        summary.style.color = 'var(--theme-color-text, #34495e)';
+                        summary.style.fontSize = '14px';
+                        
+                        if (href) summary.setAttribute('data-href', href);
+
+                        let svgArrow = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="transition: transform 0.2s;"><path d="M8 5v14l11-7z"/></svg>`;
+                        summary.innerHTML = `<span class="folder-icon" style="margin-right:6px; display:inline-flex; align-items:center; font-size:12px; transform-origin: center;">${svgArrow}</span>` + 
+                                            `<a href="${href || '#'}" style="flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit;text-decoration:none;">${name}</a>`;
+                        
+                        const icon = summary.querySelector('.folder-icon svg');
+                        
+                        const childActive = convertUL(subUL, depth + 1);
+                        
+                        details.appendChild(summary);
+                        details.appendChild(subUL); // Move UL inside details
+                        li.appendChild(details);    // Put details in LI
+                        
+                        if (isDirectlyActive || childActive) {
+                            details.open = true;
+                            anyActive = true;
+                        } else {
+                            details.open = (depth === 0);
+                        }
+                        
+                        icon.style.transform = details.open ? 'rotate(90deg)' : 'rotate(0deg)';
+                        
+                        if (isDirectlyActive) {
+                            summary.style.backgroundColor = 'rgba(66, 185, 131, 0.1)';
+                            summary.style.color = 'var(--theme-color, #42b983)';
+                        }
+
+                        summary.onmouseover = () => { if(!summary.classList.contains('active')) summary.style.backgroundColor = 'rgba(66, 185, 131, 0.1)'; };
+                        summary.onmouseout = () => { if(!summary.classList.contains('active')) summary.style.backgroundColor = 'transparent'; };
+                        
+                        summary.onclick = (e) => {
+                            if (e.target.closest('.folder-icon') || !href) {
+                                e.preventDefault();
+                                details.open = !details.open;
+                            } else {
+                                // Let Docsify route the click on the <a>
+                                details.open = true;
+                            }
+                            icon.style.transform = details.open ? 'rotate(90deg)' : 'rotate(0deg)';
+                        };
+                    } else {
+                        const itemDiv = document.createElement('a');
+                        itemDiv.className = 'explorer-item';
+                        if (isDirectlyActive) {
+                            itemDiv.classList.add('active');
+                            anyActive = true;
+                        }
+                        
+                        itemDiv.style.display = 'flex';
+                        itemDiv.style.alignItems = 'center';
+                        itemDiv.style.padding = '4px 8px'; 
+                        itemDiv.style.cursor = 'pointer';
+                        itemDiv.style.borderRadius = '4px';
+                        itemDiv.style.fontSize = '14px';
+                        itemDiv.style.color = 'var(--theme-color-text, #34495e)';
+                        itemDiv.style.textDecoration = 'none';
+                        itemDiv.href = href || '#';
+                        
+                        if (href) itemDiv.setAttribute('data-href', href);
+                        // Files don't have an icon as per user request, but we add an 18px spacer (12 icon + 6 margin) to perfectly align file text with folder text
+                        itemDiv.innerHTML = `<span style="width:18px; display:inline-block; flex-shrink:0;"></span><span style="flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit;">${name}</span>`;
+                        
+                        if (isDirectlyActive) {
+                            itemDiv.style.backgroundColor = 'rgba(66, 185, 131, 0.1)';
+                            itemDiv.style.color = 'var(--theme-color, #42b983)';
+                        }
+                        
+                        itemDiv.onmouseover = () => { if(!itemDiv.classList.contains('active')) itemDiv.style.backgroundColor = 'rgba(66, 185, 131, 0.1)'; };
+                        itemDiv.onmouseout = () => { if(!itemDiv.classList.contains('active')) itemDiv.style.backgroundColor = 'transparent'; };
+                        
+                        li.appendChild(itemDiv);
+                    }
+                });
+                return anyActive;
+            }
+            
+            convertUL(rootUL, 0);
+            nativeNav.style.paddingLeft = '0'; // Clean outer pad
+        }
+
+        transformDocsifyTOC();
         
         // Prevent double injection
         if (document.getElementById('hibook-sidebar-tabs')) return;
@@ -221,7 +354,7 @@
 
     window.$docsify.plugins = [].concat(window.$docsify.plugins || [], function(hook, vm) {
         hook.doneEach(function() {
-            setTimeout(injectTabs, 50);
+            injectTabs(); // Synchronous to eliminate FOUC!
         });
     });
 })();

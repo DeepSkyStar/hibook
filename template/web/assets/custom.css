@@ -20,19 +20,21 @@
   }
 }
 
-/* 侧边栏箭头放大优化 */
-.sidebar-nav ul:not(.app-sub-sidebar) > li:not(.file)::before {
-    width: 10px !important;
-    height: 10px !important;
-    border-right-width: 2px !important;
-    border-bottom-width: 2px !important;
-    left: -20px !important; /* 向左移，避免遮挡文字 */
-    top: 10px !important;   /* 垂直居中微调 */
-}
+/* ==========================================================================
+   原生的 Docsify 目录树 (TOC) 现已被 sidebar-tabs.js 完全重构成 <details> Flex DOM，
+   直接复用了文件管理器的渲染逻辑和行间距，这里的 CSS hack 无需保留。
+   ========================================================================== */
 
-/* 增加左侧缩进，给大箭头腾出空间 */
-.sidebar ul {
-    padding-left: 25px !important;
+/* 隐藏原生 <details> 标签自带的黑三角图标 (适配所有现代及旧版浏览器) */
+details summary::-webkit-details-marker {
+    display: none !important;
+}
+details summary::marker {
+    display: none !important;
+    content: "" !important;
+}
+details summary {
+    list-style: none !important;
 }
 
 /* --- Hibook Z-Index Layer System (Portal Architecture) --- */
@@ -65,9 +67,12 @@
         left: var(--sidebar-width) !important;
     }
 
-    /* 当侧边栏关闭时，内容占满，同时隐藏拖拽条 */
+    /* 当侧边栏关闭时，内容占满，同时隐藏拖拽条和利用百分比完全隐藏侧边栏 */
     body.close .content {
         left: 0 !important;
+    }
+    body.close .sidebar {
+        transform: translateX(-100%) !important;
     }
     body.close .sidebar-resizer {
         display: none;
@@ -93,5 +98,66 @@
         opacity: 0.8;
         width: 12px; /* 悬停时变宽方便抓住 */
         margin-left: -6px;
+    }
+}
+
+/* ==========================================================================
+   重新定位侧边栏开关 (Sidebar Toggle Relocation)
+   ========================================================================== */
+.sidebar-toggle {
+    position: fixed !important;
+    top: 15px !important;
+    bottom: auto !important;
+    left: var(--sidebar-width, 300px) !important;
+    background-color: #fff !important;
+    border: 1px solid #eee !important;
+    border-left: none !important;
+    border-radius: 0 20px 20px 0 !important;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.05) !important;
+    padding: 10px !important;
+    width: 32px !important;  
+    height: 32px !important; /* 与右上角工具栏高度一致 */
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    /* Removed 'left' from transition so it instantly snaps to the dragged splitter */
+    transition: transform 0.2s, background-color 0.2s !important;
+    z-index: var(--z-layer-fixed-ui) !important;
+    cursor: pointer !important;
+}
+
+.sidebar-toggle:hover {
+    background-color: #f9f9f9 !important;
+}
+
+/* 覆盖原生 hamburger 线条颜色和间距 */
+.sidebar-toggle span {
+    background-color: #888 !important;
+    width: 14px !important;
+    height: 2px !important;
+    margin-bottom: 3px !important;
+    border-radius: 2px !important;
+}
+
+.sidebar-toggle span:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 当侧边栏收回时，开关贴靠最左侧并且变成完整的圆角胶囊 */
+body.close .sidebar-toggle {
+    left: 0 !important;
+    border-left: 1px solid #eee !important;
+    border-radius: 50% !important; /* 收拢成圆形球 */
+    margin-left: 20px !important; /* 和右上角的 right: 20px 对称 */
+}
+
+/* 适配移动端：原生行为是在移动端弹出遮罩，不需要做复杂的左侧位移，贴靠屏幕即可 */
+@media screen and (max-width: 768px) {
+    .sidebar-toggle {
+        left: 0 !important;
+        border-left: 1px solid #eee !important;
+        border-radius: 50% !important;
+        margin-left: 10px !important;
     }
 }

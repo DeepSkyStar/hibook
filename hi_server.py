@@ -98,6 +98,7 @@ def get_knowledge_graph(root_dir):
     return _graph_cache
 
 class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    timeout = 10  # Drop idle speculative connections after 10s
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
@@ -701,8 +702,11 @@ def cmd_web(args):
     search_mgr = SearchManager.get_instance(root_dir)
     search_mgr.start_background_sync()
     
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", port), HibookHTTPRequestHandler) as httpd:
+    class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+        daemon_threads = True
+        allow_reuse_address = True
+
+    with ThreadedTCPServer(("", port), HibookHTTPRequestHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

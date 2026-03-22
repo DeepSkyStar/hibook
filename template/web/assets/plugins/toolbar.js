@@ -20,14 +20,8 @@
     wrap.style.zIndex = 'var(--z-layer-fixed-ui)';
     wrap.style.border = '1px solid #eee';
     
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-       wrap.style.backgroundColor = '#2d2d2d';
-       wrap.style.borderColor = '#444';
-       wrap.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
-    }
-    
     const toggleBtn = document.createElement('div');
-    toggleBtn.innerHTML = '▶';
+    toggleBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
     toggleBtn.style.width = '30px';
     toggleBtn.style.height = '30px';
     toggleBtn.style.display = 'flex';

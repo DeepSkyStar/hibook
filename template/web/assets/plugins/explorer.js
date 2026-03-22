@@ -65,8 +65,7 @@
                 setupItemDiv(summary);
                 summary.style.listStyle = 'none'; // hide default arrow
                 
-                summary.innerHTML = `<style>summary::-webkit-details-marker { display: none; }</style>` + 
-                                    `<span class="folder-icon" style="margin-right:6px; display:inline-block; transition:transform 0.2s; font-size:12px; transform-origin: center;">▶</span>` + 
+                summary.innerHTML = `<span class="folder-icon" style="margin-right:6px; display:inline-flex; align-items:center; transition:transform 0.2s; font-size:12px; transform-origin: center;"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>` + 
                                     `<span style="flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--theme-color-text, #34495e);">${item.name}</span>`;
 
                 // Rotate arrow on toggle

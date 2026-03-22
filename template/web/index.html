@@ -10,7 +10,7 @@
   <link rel="stylesheet" href=".hibook_web/sidebar.min.css" />
   <link rel="stylesheet" href=".hibook_web/katex.min.css" />
   <link rel="stylesheet" href=".hibook_web/vendor/easymde/easymde.min.css" />
-  <link rel="stylesheet" href=".hibook_web/custom.css" />
+  <link rel="stylesheet" href=".hibook_web/custom.css?v=10" />
 </head>
 <body>
   <div id="app">加载中...</div>
@@ -25,16 +25,14 @@
   <script src=".hibook_web/vendor/easymde/easymde.min.js"></script>
   <script src=".hibook_web/plugins/wikilinks.js?v=4"></script>
   <script src=".hibook_web/plugins/backlinks.js?v=4"></script>
-  <script src=".hibook_web/plugins/toolbar.js?v=5"></script>
+  <script src=".hibook_web/plugins/toolbar.js?v=6"></script>
   <script src=".hibook_web/plugins/editor.js?v=6"></script>
   <script src=".hibook_web/plugins/git-timeline.js?v=10"></script>
   <script src=".hibook_web/plugins/graph-view.js?v=4"></script>
-  <!-- Docsify Sidebar Collapse (Local Modified) -->
-  <script src=".hibook_web/docsify-sidebar-collapse.js?v=20260114"></script>
-  
+  <script src=".hibook_web/plugins/graph-view.js?v=4"></script>
   <script src=".hibook_web/plugins/search.js?v=3"></script>
-  <script src=".hibook_web/plugins/sidebar-tabs.js?v=4"></script>
-  <script src=".hibook_web/plugins/explorer.js?v=7"></script>
+  <script src=".hibook_web/plugins/sidebar-tabs.js?v=10"></script>
+  <script src=".hibook_web/plugins/explorer.js?v=9"></script>
   
   <!-- Mobile Gestures -->
   <script src=".hibook_web/mobile-gestures.js"></script>
@@ -57,9 +55,44 @@
         }
     });
   </script>
-  
   <!-- KaTeX -->
   <script src=".hibook_web/katex.min.js"></script>
   <script src=".hibook_web/docsify-katex.js"></script>
+
+  <!-- Mobile Sidebar Shield -->
+  <script>
+    (function() {
+        // Prevent mobile sidebar from aggressively auto-collapsing
+        // when clicking our custom buttons or tree items.
+        window.keepSidebarOpenOnMobile = false;
+        
+        // 1. Intercept all clicks on the sidebar in the capture phase
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.querySelector('.sidebar');
+                // If clicked inside the sidebar but NOT on the native hamburger toggle
+                if (sidebar && sidebar.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+                    window.keepSidebarOpenOnMobile = true;
+                    // Auto-release the shield after 300ms (enough time to absorb Docsify changes)
+                    setTimeout(() => window.keepSidebarOpenOnMobile = false, 300);
+                }
+            }
+        }, true);
+        
+        // 2. Docsify closes the sidebar by removing the 'close' class on body. 
+        // We use a MutationObserver to instantly put it back if our shield is active.
+        const observer = new MutationObserver((mutations) => {
+            if (window.innerWidth <= 768 && window.keepSidebarOpenOnMobile) {
+                mutations.forEach((m) => {
+                    if (m.attributeName === 'class' && !document.body.classList.contains('close')) {
+                        // Docsify stripped it! Put it back.
+                        document.body.classList.add('close');
+                    }
+                });
+            }
+        });
+        observer.observe(document.body, { attributes: true });
+    })();
+  </script>
 </body>
 </html>
