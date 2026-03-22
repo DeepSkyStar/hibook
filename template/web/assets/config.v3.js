@@ -2,7 +2,7 @@ window.$docsify = {
   name: 'Hibook Library',
   repo: '',
   homepage: 'README.md',
-  loadSidebar: 'SUMMARY.md?v=' + Date.now(),
+  loadSidebar: 'SUMMARY.md',
   loadNavbar: false,
   relativePath: true,
   subMaxLevel: 1, 

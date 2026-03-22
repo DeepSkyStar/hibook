@@ -227,6 +227,115 @@ function gitTimelinePlugin(hook, vm) {
         container.innerHTML = '<span style="color:#999; font-size: 0.9em;">无法获取时间线或无记录。</span>';
       });
   });
+
+  function loadGlobalHistory() {
+      if (!drawer) initTimelineUI();
+      drawer.style.transform = 'translateX(0)';
+      
+      const title = drawer.querySelector('h3');
+      if(title) title.innerHTML = '🌍 全局时间线';
+      
+      const container = document.getElementById('git-timeline-content');
+      if (!container) return;
+      
+      container.innerHTML = '<span style="color:#999">抓取全局日志中...</span>';
+      
+      fetch('/_api/history?file=')
+        .then(res => res.json())
+        .then(history => {
+            if (!history || history.length === 0) {
+              container.innerHTML = '<span style="color:#999; font-size: 0.9em;">暂无 Git 变更记录。</span>';
+              return;
+            }
+            
+            var listHtml = '<ul style="list-style:none; padding-left:0; border-left: 2px solid #eaecef; margin-left: 10px; margin-bottom: 0;">';
+            history.forEach(function(commit) {
+              let unsyncedTag = !commit.is_synced ? '<span style="color:#e67e22; font-weight:bold; margin-left:5px;">(Unsynced)</span>' : '';
+              listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" data-synced="' + commit.is_synced + '" style="position: relative; margin-bottom: 20px; padding-left: 20px; cursor: pointer;">' +
+                          '<div style="position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #42b983; border: 2px solid #fff; box-shadow: 0 0 0 1px #eaecef;"></div>' +
+                          '<div style="font-size: 0.85em; color: #888; margin-bottom: 6px;">' +
+                          '<strong style="color: #555;">' + commit.date + '</strong> • ' + commit.author + unsyncedTag + ' ' +
+                          '<code style="background: #f1f1f1; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; margin-left: 5px; color:#333;">' + commit.hash + '</code>' +
+                          '</div>' +
+                          '<div style="color: #444; font-size: 0.95em; line-height: 1.5;">' + commit.message + '</div>' +
+                          '</li>';
+            });
+            listHtml += '</ul>';
+            container.innerHTML = listHtml;
+            
+            const nodes = container.querySelectorAll('.timeline-node');
+            nodes.forEach(node => {
+                node.onmouseenter = () => node.style.backgroundColor = 'rgba(66, 185, 131, 0.1)';
+                node.onmouseleave = () => node.style.backgroundColor = 'transparent';
+                node.onclick = () => {
+                   const hash = node.getAttribute('data-hash');
+                   historyModal.style.display = 'flex';
+                   historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">获取 '+hash+' 全局改动中...</h2>';
+                   fetch('/_api/commit_info?hash=' + hash)
+                     .then(r => r.json())
+                     .then(data => {
+                         let diffHtml = '<pre style="white-space:pre-wrap; background:#f8f9fa; padding:15px; border-radius:6px; font-size:12px; font-family:monospace; border:1px solid #ddd; overflow-x:auto;">' + 
+                                        data.diff.replace(/</g, '&lt;').replace(/>/g, '&gt;') + 
+                                        '</pre>';
+                         
+                         let actionsHtml = `<div style="margin-top: 10px; margin-bottom: 15px;">`;
+                         actionsHtml += `<button id="btn-revert-global" style="padding: 6px 12px; cursor: pointer; background: #f39c12; color: white; border: none; border-radius: 4px; margin-right: 10px;">回滚全库至此时刻</button>`;
+                         if (node.getAttribute('data-synced') === 'false') {
+                             actionsHtml += `<button id="btn-undo-global-commit" style="padding: 6px 12px; cursor: pointer; background: #e74c3c; color: white; border: none; border-radius: 4px;">抹掉该记录</button>`;
+                         }
+                         actionsHtml += `</div>`;
+                         
+                         historyModalContent.innerHTML = 
+                            '<div style="background:#eaf2ff; color:#0e5a97; padding:10px; margin-bottom:10px; border-radius:4px; border:1px solid #b8daff;">' +
+                            '<strong>🌍 全局 Commit (只读)</strong> - <code>' + hash + '</code> 时刻的详细变动。' + actionsHtml +
+                            '</div>' + diffHtml;
+                            
+                         let revertBtn = document.getElementById('btn-revert-global');
+                         if (revertBtn) {
+                             revertBtn.onclick = () => {
+                                 if (confirm(`超级警告：确定要将【整个知识库】强制回滚至 ${hash} 的状态吗？\n所有未提交的更改将被丢弃。`)) {
+                                     fetch('/_api/revert_global', {
+                                         method: 'POST',
+                                         headers: { 'Content-Type': 'application/json' },
+                                         body: JSON.stringify({ hash: hash })
+                                     }).then(r => r.json()).then(res => {
+                                         if (res.success) { alert("全库回滚成功！"); window.location.reload(); }
+                                         else { alert("回滚失败: " + res.error); }
+                                     });
+                                 }
+                             };
+                         }
+
+                         let undoBtn = document.getElementById('btn-undo-global-commit');
+                         if (undoBtn) {
+                             undoBtn.onclick = () => {
+                                 if (confirm("确定要彻底抹掉这条全局历史记录吗？\n这是高危操作，将放弃本次提价！")) {
+                                     fetch('/_api/drop_commit', {
+                                         method: 'POST',
+                                         headers: { 'Content-Type': 'application/json' },
+                                         body: JSON.stringify({ hash: hash })
+                                     }).then(r => r.json()).then(res => {
+                                         if (res.success) { alert("抹除记录成功！"); window.location.reload(); }
+                                         else { alert("操作失败: " + res.error); }
+                                     });
+                                 }
+                             };
+                         }
+                     })
+                     .catch(e => {
+                         historyModalContent.innerHTML = '<h2 style="text-align:center;color:red;margin-top:20vh;">无法加载全局 Diff</h2><p>'+e.message+'</p>';
+                     });
+                };
+            });
+        })
+        .catch(err => {
+            container.innerHTML = '<span style="color:#999; font-size: 0.9em;">获取全局历史失败。</span>';
+        });
+  }
+
+  // Expose methods globally
+  window.openTimelineDrawer = openTimelineDrawer;
+  window.loadGlobalHistory = loadGlobalHistory;
 }
 
 window.$docsify = window.$docsify || {};

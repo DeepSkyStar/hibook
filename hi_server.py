@@ -12,9 +12,22 @@ import json
 from hi_basic import *
 import time as _time
 from hi_search import SearchManager
+import hi_export
 
 _graph_cache = None
 _graph_cache_time = 0
+
+def _is_sync_required():
+    try:
+        # Check if local is behind remote. Fast timeout.
+        subprocess.run(['git', 'fetch'], capture_output=True, timeout=3)
+        res = subprocess.run(['git', 'status', '-sb'], capture_output=True, text=True)
+        if '[behind' in res.stdout:
+            return True
+        return False
+    except Exception:
+        return False
+
 
 def get_knowledge_graph(root_dir):
     global _graph_cache, _graph_cache_time
@@ -94,14 +107,19 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             file_path = query.get('file', [''])[0]
             
             # Remove leading slash from file_path if present so git can find it correctly relative to cwd
+            # Remove leading slash from file_path if present so git can find it correctly relative to cwd
             file_path = file_path.lstrip('/')
             
-            if not file_path or not os.path.exists(file_path):
+            # If file_path is empty, we do a global repo history fetch
+            if file_path and not os.path.exists(file_path):
                 self.send_error(404, "File not found")
                 return
                 
             try:
-                cmd = ['git', 'log', '--pretty=format:%h|%an|%ad|%s', '--date=short', '--', file_path]
+                if not file_path:
+                    cmd = ['git', 'log', '--pretty=format:%h|%an|%ad|%s', '--date=short', '-n', '50']
+                else:
+                    cmd = ['git', 'log', '--pretty=format:%h|%an|%ad|%s', '--date=short', '--', file_path]
                 output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
                 
                 # Fetch unsynced hashes safely
@@ -165,6 +183,34 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(msg)
             return
 
+        if path == '/_api/tree':
+            def build_tree(dir_path):
+                tree = []
+                try:
+                    entries = sorted(os.listdir(dir_path))
+                except:
+                    return tree
+                for entry in entries:
+                    if entry.startswith('.') or entry == 'template': continue
+                    full_p = os.path.join(dir_path, entry)
+                    rel_p = os.path.relpath(full_p, os.getcwd())
+                    if os.path.isdir(full_p):
+                        children = build_tree(full_p)
+                        tree.append({"type": "folder", "name": entry, "path": rel_p, "children": children})
+                    elif entry.endswith('.md'):
+                         tree.append({"type": "file", "name": entry, "path": rel_p})
+                return tree
+                
+            tree_data = build_tree(os.getcwd())
+            encoded = json.dumps(tree_data).encode('utf-8')
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
+
         if path == '/_api/graph':
             root_dir = os.getcwd()
             graph = get_knowledge_graph(root_dir)
@@ -209,6 +255,49 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(encoded)
             return
+
+        if path.startswith('/_api/commit_info'):
+            query = urllib.parse.parse_qs(parsed_url.query)
+            commit_hash = query.get('hash', [''])[0]
+            if not commit_hash:
+                self.send_error(400, "Missing hash")
+                return
+            try:
+                # Get stats and concise patch
+                output = subprocess.check_output(['git', 'show', '--stat', '--patch', commit_hash], stderr=subprocess.STDOUT, text=True)
+                encoded = json.dumps({"diff": output}).encode('utf-8')
+                self.send_response(200)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+            except Exception as e:
+                self.send_error(500, f"Git show error: {str(e)}")
+            return
+            
+        if path == '/_api/revert_global':
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                hash_to_revert = data.get('hash')
+                if hash_to_revert:
+                    try:
+                        subprocess.check_call(['git', 'checkout', hash_to_revert, '.'], stderr=subprocess.STDOUT)
+                        subprocess.check_call(['git', 'commit', '-am', f"Reverted repo globally to state at {hash_to_revert}"], stderr=subprocess.STDOUT)
+                        
+                        import hi_export
+                        hi_export.cmd_update()
+                        self.send_response(200)
+                        self.send_header("Content-type", "application/json; charset=utf-8")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"success": True}).encode('utf-8'))
+                        return
+                    except subprocess.CalledProcessError as e:
+                        self.send_error(500, f"Git checkout error: {e.output.decode('utf-8') if hasattr(e, 'output') and e.output else str(e)}")
+                        return
+            self.send_error(400, "Bad Request")
+            return
             
         if path == '/_api/status':
             try:
@@ -232,12 +321,33 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Check if there are any modified files (M) or untracked (?)
                 dirty = len([l for l in lines[1:] if l.strip()]) > 0
                     
+                files_status = {}
+                try:
+                    porcelain_out = subprocess.check_output(['git', 'status', '--porcelain'], stderr=subprocess.STDOUT, text=True)
+                    for line in porcelain_out.split('\n'):
+                        if len(line) > 3:
+                            code = line[:2]
+                            fpath = line[3:].split(' -> ')[-1].strip()
+                            if fpath.startswith('"') and fpath.endswith('"'): fpath = fpath[1:-1]
+                            
+                            code_strip = code.strip()
+                            if code_strip == '??': state = 'U'
+                            elif 'M' in code: state = 'M'
+                            elif 'A' in code: state = 'A'
+                            elif 'D' in code: state = 'D'
+                            elif 'R' in code: state = 'R'
+                            else: state = 'M'
+                            files_status[fpath] = state
+                except:
+                    pass
+
                 resp = {
                     "conflict": conflict,
                     "ahead": ahead,
                     "behind": behind,
                     "dirty": dirty,
-                    "branch_info": branch_info
+                    "branch_info": branch_info,
+                    "files": files_status
                 }
                 encoded = json.dumps(resp).encode('utf-8')
                 self.send_response(200)
@@ -383,6 +493,126 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     subprocess.run(['git', 'rebase', '--abort'], capture_output=True)
                     return send_json({"success": False, "error": "无法彻底抹除该记录由于存在冲突。请手动解决或使用回滚操作。\n详情: " + res.stderr + res.stdout})
                 return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+        
+        if path == '/_api/fs/create':
+            target_path = req.get('path', '').lstrip('/')
+            is_dir = req.get('is_dir', False)
+            append_to_summary = req.get('append_summary', False)
+            title = req.get('title', '')
+            
+            if not target_path: return send_json({"success": False, "error": "Missing path"}, 400)
+            try:
+                if is_dir:
+                    os.makedirs(target_path, exist_ok=True)
+                    subprocess.run(['git', 'add', target_path])
+                    subprocess.run(['git', 'commit', '-m', f"Create directory {target_path}"])
+                else:
+                    os.makedirs(os.path.dirname(target_path) or '.', exist_ok=True)
+                    if not os.path.exists(target_path):
+                        with open(target_path, 'w', encoding='utf-8') as f:
+                            note_title = title if title else (os.path.basename(target_path)[:-3] if target_path.endswith('.md') else os.path.basename(target_path))
+                            f.write(f'# {note_title}\n\n')
+                        
+                        subprocess.run(['git', 'add', target_path])
+                        commit_msg = f"Create {target_path}"
+                        
+                        if append_to_summary:
+                            import hi_export
+                            hi_export.cmd_update(None)
+                            subprocess.run(['git', 'add', 'SUMMARY.md'])
+                            commit_msg = f"Create {target_path} and update SUMMARY.md"
+                            
+                        subprocess.run(['git', 'commit', '-m', commit_msg])
+                        search_mgr = SearchManager.get_instance()
+                        if search_mgr: search_mgr.sync_index()
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+
+        if path == '/_api/fs/append_summary':
+            link_target = req.get('link', '')
+            title = req.get('title', '')
+            if not link_target or not title:
+                return send_json({"success": False, "error": "Missing link or title"}, 400)
+            try:
+                summary_path = 'SUMMARY.md'
+                with open(summary_path, 'a', encoding='utf-8') as f:
+                    # Append it formatted
+                    f.write(f"* [{title}](/{link_target})\n")
+                subprocess.run(['git', 'add', 'SUMMARY.md'])
+                subprocess.run(['git', 'commit', '-m', f"Add {title} to SUMMARY.md"])
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+
+        if path == '/_api/fs/delete':
+            target_path = req.get('path', '').lstrip('/')
+            if not target_path or not os.path.exists(target_path):
+                return send_json({"success": False, "error": "Path not found"}, 400)
+            if _is_sync_required():
+                return send_json({"success": False, "error": "硬隔离触发: 检测到您的本地版本落后于云端！\n请先点击右上角的【Sync】按钮拉取最新更改，然后再执行删除操作，以防发生冲突。"}, 400)
+                
+            try:
+                subprocess.run(['git', 'rm', '-r', target_path])
+                subprocess.run(['git', 'commit', '-m', f"Delete {target_path}"])
+                
+                # Auto Sync SUMMARY.md
+                try:
+                    hi_export.cmd_update(None)
+                    subprocess.run(['git', 'add', 'SUMMARY.md'])
+                    subprocess.run(['git', 'commit', '-m', f"Auto-update SUMMARY.md after deleting {target_path}"])
+                except Exception as e:
+                    print(f"Warning: Auto-update SUMMARY failed: {e}")
+                    
+                search_mgr = SearchManager.get_instance()
+                if search_mgr: search_mgr.sync_index()
+                return send_json({"success": True})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+
+        if path == '/_api/fs/rename':
+            old_path = req.get('old_path', '').lstrip('/')
+            new_path = req.get('new_path', '').lstrip('/')
+            if not old_path or not new_path or not os.path.exists(old_path):
+                return send_json({"success": False, "error": "Invalid paths"}, 400)
+            if _is_sync_required():
+                return send_json({"success": False, "error": "硬隔离触发: 检测到您的本地版本落后于云端！\n重组多重链接可能产生极为复杂的网状冲突。请先点击右上角的【Sync】按钮确保处于最新状态，再重命名或移动全域级文件/文件夹。"}, 400)
+                
+            try:
+                os.makedirs(os.path.dirname(new_path) or '.', exist_ok=True)
+                subprocess.run(['git', 'mv', old_path, new_path], check=True)
+                
+                old_base = os.path.basename(old_path)[:-3] if old_path.endswith('.md') else os.path.basename(old_path)
+                new_base = os.path.basename(new_path)[:-3] if new_path.endswith('.md') else os.path.basename(new_path)
+                
+                modified_files = []
+                # Backlink rewriting for [[Wikilinks]] only if it's a markdown file
+                if old_base != new_base and old_path.endswith('.md') and new_path.endswith('.md'):
+                    for root, _, files in os.walk(os.getcwd()):
+                        dirs = [d for d in root.split(os.sep) if d.startswith('.')]
+                        if dirs: continue
+                        for f in files:
+                            if f.endswith('.md'):
+                                full_p = os.path.join(root, f)
+                                rel_p = os.path.relpath(full_p, os.getcwd())
+                                if rel_p == new_path: continue
+                                
+                                with open(full_p, 'r', encoding='utf-8') as file_obj:
+                                    content = file_obj.read()
+                                    
+                                new_content = re.sub(rf'\[\[{re.escape(old_base)}\]\]', f'[[{new_base}]]', content)
+                                if new_content != content:
+                                    with open(full_p, 'w', encoding='utf-8') as file_obj:
+                                        file_obj.write(new_content)
+                                    subprocess.run(['git', 'add', rel_p])
+                                    modified_files.append(rel_p)
+                
+                subprocess.run(['git', 'commit', '-m', f"Rename {old_path} to {new_path} and update {len(modified_files)} links"])
+                search_mgr = SearchManager.get_instance()
+                if search_mgr: search_mgr.sync_index()
+                return send_json({"success": True, "updated_links": len(modified_files)})
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
         
