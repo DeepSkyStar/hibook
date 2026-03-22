@@ -11,6 +11,7 @@ import subprocess
 import json
 from hi_basic import *
 import time as _time
+from hi_search import SearchManager
 
 _graph_cache = None
 _graph_cache_time = 0
@@ -46,31 +47,32 @@ def get_knowledge_graph(root_dir):
             with open(full_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Extract title from the first heading 1
-            title_match = re.search(r'^#\s+(.*?)$', content, re.MULTILINE)
-            label = title_match.group(1).strip() if title_match else os.path.basename(path)[:-3]
-            nodes.append({"id": path, "label": label})
+            # Extract metadata using centralized parser
+            search_mgr = SearchManager.get_instance(root_dir)
+            title, tags, aliases, body = search_mgr.parse_frontmatter(content)
+            label = title if title else os.path.basename(path)[:-3]
+            nodes.append({"id": path, "label": label, "tags": tags, "aliases": aliases})
                 
-            for match in re.finditer(r'\[\[(.*?)\]\]', content):
+            for match in re.finditer(r'\[\[(.*?)\]\]', body):
                 wl = match.group(1)
                 target = basename_to_path.get(wl)
                 if not target and wl + ".md" in file_contents: 
                     target = wl + ".md"
                 if target:
                     start = max(0, match.start() - 30)
-                    end = min(len(content), match.end() + 30)
-                    snippet = content[start:end].replace('\n', ' ')
+                    end = min(len(body), match.end() + 30)
+                    snippet = body[start:end].replace('\n', ' ')
                     edges.append({"source": path, "target": target})
                     backlinks[target].append({"source": path, "type": "wikilink", "text": wl, "snippet": snippet})
                     
-            for match in re.finditer(r'\[(.*?)\]\((.*?\.md)\)', content):
+            for match in re.finditer(r'\[(.*?)\]\((.*?\.md)\)', body):
                 text = match.group(1)
                 link = match.group(2)
                 target_path = os.path.normpath(os.path.join(os.path.dirname(path), link))
                 if target_path in file_contents:
                      start = max(0, match.start() - 30)
-                     end = min(len(content), match.end() + 30)
-                     snippet = content[start:end].replace('\n', ' ')
+                     end = min(len(body), match.end() + 30)
+                     snippet = body[start:end].replace('\n', ' ')
                      edges.append({"source": path, "target": target_path})
                      backlinks[target_path].append({"source": path, "type": "link", "text": text, "snippet": snippet})
         except Exception:
@@ -185,6 +187,20 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             links = graph["backlinks"].get(file_path, [])
             encoded = json.dumps(links).encode('utf-8')
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
+
+        if path == '/_api/search':
+            query = urllib.parse.parse_qs(parsed_url.query).get('q', [''])[0]
+            search_mgr = SearchManager.get_instance()
+            results = search_mgr.search(query) if search_mgr else []
+            encoded = json.dumps(results).encode('utf-8')
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
@@ -308,6 +324,17 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 subprocess.run(['git', 'commit', '-m', msg], capture_output=True)
                 # Get the new hash
                 out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], text=True)
+                
+                # Update Search Index
+                search_mgr = SearchManager.get_instance()
+                if search_mgr:
+                    import sqlite3 # Import needed inline
+                    mtime = os.path.getmtime(file_path)
+                    with search_mgr.lock:
+                        with sqlite3.connect(search_mgr.db_path) as conn:
+                            search_mgr._update_file_index(conn, file_path, os.path.join(search_mgr.root_dir, file_path), mtime)
+                            conn.commit()
+                            
                 return send_json({"success": True, "hash": out.strip()})
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
@@ -392,8 +419,12 @@ def cmd_web(args):
             shutil.copy2(src_index, index_path)
             HiLog.info("Injected Docsify index.html into current directory.")
 
-    HiLog.info(f"Starting web server at http://localhost:{port}")
+    HiLog.info("Starting web server at http://localhost:{port}")
     HiLog.info("Press Ctrl+C to stop.")
+    
+    # Initialize background indexing module
+    search_mgr = SearchManager.get_instance(root_dir)
+    search_mgr.start_background_sync()
     
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", port), HibookHTTPRequestHandler) as httpd:
