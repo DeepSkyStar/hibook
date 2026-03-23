@@ -44,6 +44,8 @@ def get_knowledge_graph(root_dir):
         for f in files:
             if f.endswith('.md'):
                 path = os.path.relpath(os.path.join(root, f), root_dir)
+                if path in ['SUMMARY.md', 'RULE.md']:
+                    continue
                 file_contents[path] = os.path.join(root, f)
                 
     nodes = []
@@ -78,10 +80,28 @@ def get_knowledge_graph(root_dir):
                     edges.append({"source": path, "target": target})
                     backlinks[target].append({"source": path, "type": "wikilink", "text": wl, "snippet": snippet})
                     
-            for match in re.finditer(r'\[(.*?)\]\((.*?\.md)\)', body):
-                text = match.group(1)
-                link = match.group(2)
-                target_path = os.path.normpath(os.path.join(os.path.dirname(path), link))
+            for match in re.finditer(r'\[([^\]]+)\]\(([^\)]+)\)', body):
+                text = match.group(1).strip()
+                link = match.group(2).split('#')[0].strip() # Trim hash fragments
+                
+                if not link or link.startswith('http'):
+                    continue
+                    
+                # Auto-resolve directory links natively to Docsify's README.md
+                if not link.endswith('.md'):
+                    if link.endswith('/'):
+                        link += "README.md"
+                    elif not "." in link.split('/')[-1]:
+                        link += "/README.md"
+                    else:
+                        continue # Ignore .png, .jpg files, etc.
+                        
+                # Fix routing resolving absolute / prefixes dynamically
+                if link.startswith('/'):
+                    target_path = os.path.normpath(link.lstrip('/'))
+                else:
+                    target_path = os.path.normpath(os.path.join(os.path.dirname(path), link))
+                    
                 if target_path in file_contents:
                      start = max(0, match.start() - 30)
                      end = min(len(body), match.end() + 30)

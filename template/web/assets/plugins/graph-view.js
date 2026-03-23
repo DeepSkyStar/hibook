@@ -58,10 +58,10 @@
     closeBtn.style.position = 'absolute';
     closeBtn.style.top = '25px';
     closeBtn.style.right = '35px';
-    closeBtn.style.color = '#fff';
+    closeBtn.style.color = '#333';
     closeBtn.style.fontSize = '30px';
     closeBtn.style.cursor = 'pointer';
-    closeBtn.style.background = 'rgba(255,255,255,0.1)';
+    closeBtn.style.background = 'rgba(0,0,0,0.05)';
     closeBtn.style.width = '50px';
     closeBtn.style.height = '50px';
     closeBtn.style.borderRadius = '25px';
@@ -75,7 +75,7 @@
     chartContainer.id = 'graph-chart';
     chartContainer.style.width = '90vw';
     chartContainer.style.height = '85vh';
-    chartContainer.style.backgroundColor = '#1e1e1e';
+    chartContainer.style.backgroundColor = '#ffffff';
     chartContainer.style.borderRadius = '15px';
     chartContainer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
     modal.appendChild(chartContainer);
@@ -90,7 +90,7 @@
     const chartDom = document.getElementById('graph-chart');
     const myChart = echarts.init(chartDom);
     
-    myChart.showLoading({ color: '#42b983', textColor: '#fff', maskColor: 'rgba(30,30,30,0.8)' });
+    myChart.showLoading({ color: '#42b983', textColor: '#333', maskColor: 'rgba(255,255,255,0.8)' });
     
     fetch('/_api/graph')
       .then(res => res.json())
@@ -105,7 +105,7 @@
         });
 
         const option = {
-          backgroundColor: '#1e1e1e',
+          backgroundColor: '#ffffff',
           tooltip: {
             formatter: '{b}'
           },
@@ -118,38 +118,85 @@
                 name: n.label,
                 symbolSize: 15 + Math.min((nodeDegrees[n.id] || 0) * 3, 40),
                 itemStyle: { 
-                  color: '#42b983',
-                  borderColor: '#2c8f63',
-                  borderWidth: 2
+                  color: '#333333',
+                  borderColor: '#222222',
+                  borderWidth: 1
                 },
                 label: { 
                   show: (nodeDegrees[n.id] || 0) > 1, // Only show label for nodes with connections by default
                   position: 'bottom', 
-                  color: '#ccc',
+                  color: '#666',
                   distance: 8
                 },
                 emphasis: {
-                    focus: 'adjacency',
-                    label: { show: true, color: '#fff', fontWeight: 'bold' }
+                  label: { show: true, color: '#42b983', fontWeight: 'bold', fontSize: 13 },
+                  itemStyle: { color: '#42b983', borderColor: '#2c8f63', borderWidth: 2 }
+                },
+                select: {
+                  label: { show: true, color: '#42b983', fontWeight: 'bold', fontSize: 13 },
+                  itemStyle: { color: '#42b983', borderColor: '#2c8f63', borderWidth: 2 }
                 }
               })),
               edges: data.edges.map(e => ({
                 source: e.source,
                 target: e.target,
-                lineStyle: { color: 'rgba(66, 185, 131, 0.4)', curveness: 0.1, width: 1.5 }
+                lineStyle: { color: '#cccccc', curveness: 0.1, width: 1.5 },
+                emphasis: {
+                  lineStyle: { color: '#42b983', width: 3, opacity: 0.8 }
+                }
               })),
+              labelLayout: {
+                  hideOverlap: false
+              },
+              emphasis: {
+                focus: 'adjacency'
+              },
+              selectedMode: 'multiple',
               roam: true,
               force: { repulsion: 250, edgeLength: 120, gravity: 0.1 }
             }
           ]
         };
-        myChart.setOption(option);
+        myChart.setOption(option, true);
         
         myChart.on('click', function (params) {
           if (params.dataType === 'node') {
+            myChart.dispatchAction({ type: 'unselect', seriesIndex: 0 });
+            myChart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
             modal.style.display = 'none';
             window.location.hash = '#/' + params.data.id.replace('.md', '');
           }
+        });
+
+        myChart.on('mouseover', { dataType: 'node' }, function (params) {
+            let neighborIndices = [];
+            let nodeId = params.data.id;
+            data.nodes.forEach((n, i) => {
+                let connected = data.edges.some(e => 
+                    (e.source === nodeId && e.target === n.id) || 
+                    (e.target === nodeId && e.source === n.id)
+                );
+                if (connected) {
+                    neighborIndices.push(i);
+                }
+            });
+            if (neighborIndices.length > 0) {
+              myChart.dispatchAction({
+                  type: 'select',
+                  dataType: 'node',
+                  seriesIndex: 0,
+                  dataIndex: neighborIndices
+              });
+            }
+        });
+        
+        myChart.on('mouseout', { dataType: 'node' }, function (params) {
+            let allIndices = data.nodes.map((n, i) => i);
+            myChart.dispatchAction({
+                type: 'unselect',
+                seriesIndex: 0,
+                dataIndex: allIndices
+            });
         });
       })
       .catch(e => {
