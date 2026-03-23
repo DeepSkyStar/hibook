@@ -1,5 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // API Bridge binding testing placeholder
+    // Auto-collapse sidebar on mobile
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) sidebar.classList.add('sidebar-closed');
+    }
+
     // Wait for DOM
     loadWorkspaces();
     loadSettings();

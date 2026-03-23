@@ -125,6 +125,12 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     width: 100%;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+}
+
+.btn:hover {
+    background: rgba(59, 130, 246, 0.15);
 }
 
 .btn-primary {
@@ -153,8 +159,15 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 32px 48px 32px 80px; /* Safe harbor for left fixed 40px hamburger toggle */
+    padding: 32px 48px 0 80px; /* Top Right Bottom Left */
     overflow-y: auto;
+}
+
+.main-content::after {
+    content: '';
+    display: block;
+    min-height: 120px;
+    flex-shrink: 0;
 }
 
 .top-header {
@@ -343,7 +356,7 @@ body {
     display: none;
     justify-content: center;
     align-items: center;
-    z-index: 100;
+    z-index: 9999;
 }
 
 .modal-card {
@@ -461,4 +474,16 @@ body {
     color: #60a5fa;
     display: flex;
     align-items: center;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 0 24px 0 24px;
+    }
+    .top-header {
+        margin-top: 72px;
+    }
+    .workspace-grid {
+        grid-template-columns: 1fr;
+    }
 }
