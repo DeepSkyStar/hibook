@@ -1,245 +1,299 @@
-function gitTimelinePlugin(hook, vm) {
-  let drawer = null;
-  let historyModal = null;
-  let historyModalContent = null;
+// git-timeline.js
+(function () {
+  class HiGitTimeline extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      this.currentVmRouteFile = null;
 
-  function initTimelineUI() {
-    if (document.getElementById('git-timeline-drawer')) return;
-    
-    // Create Drawer
-    drawer = document.createElement('div');
-    drawer.id = 'git-timeline-drawer';
-    drawer.style.position = 'fixed';
-    drawer.style.top = '0';
-    drawer.style.right = '0';
-    drawer.style.width = '350px';
-    drawer.style.height = '100vh';
-    drawer.style.backgroundColor = '#fff';
-    drawer.style.boxShadow = '-5px 0 15px rgba(0,0,0,0.1)';
-    // Applies to the structured drawer layer from custom.css
-    drawer.style.zIndex = 'var(--z-layer-drawer)';
-    drawer.style.transform = 'translateX(100%)';
-    drawer.style.transition = 'transform 0.3s ease-in-out';
-    drawer.style.overflowY = 'auto';
-    drawer.style.padding = '20px';
-    drawer.style.boxSizing = 'border-box';
-    drawer.style.fontFamily = 'var(--baseFontFamily, sans-serif)';
-    
-    // Dark mode support
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-       drawer.style.backgroundColor = '#1e1e1e';
-       drawer.style.color = '#fff';
+      this.openTimelineDrawer = this.openTimelineDrawer.bind(this);
+      this.closeTimelineDrawer = this.closeTimelineDrawer.bind(this);
+      this.closeHistoryModal = this.closeHistoryModal.bind(this);
+      this.loadGlobalHistory = this.loadGlobalHistory.bind(this);
+      this.loadPageHistory = this.loadPageHistory.bind(this);
+      this.viewHistoricalCommit = this.viewHistoricalCommit.bind(this);
     }
 
-    const closeBtn = document.createElement('div');
-    closeBtn.innerHTML = '✕';
-    closeBtn.style.position = 'absolute';
-    closeBtn.style.top = '15px';
-    closeBtn.style.right = '20px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.style.fontSize = '20px';
-    closeBtn.onclick = () => drawer.style.transform = 'translateX(100%)';
-    drawer.appendChild(closeBtn);
-
-    const title = document.createElement('h3');
-    title.innerHTML = '⏱️ 变更时间线';
-    title.style.marginTop = '0';
-    title.style.borderBottom = '1px solid #eaecef';
-    title.style.paddingBottom = '10px';
-    drawer.appendChild(title);
-
-    const content = document.createElement('div');
-    content.id = 'git-timeline-content';
-    content.innerHTML = '<span style="color:#999">请打开或刷新页面加载历史...</span>';
-    drawer.appendChild(content);
-
-    document.body.appendChild(drawer);
-    
-    // Create Historical Viewer Modal
-    historyModal = document.createElement('div');
-    historyModal.style.position = 'fixed';
-    historyModal.style.top = '0';
-    historyModal.style.left = '0';
-    historyModal.style.width = '100vw';
-    historyModal.style.height = '100vh';
-    historyModal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-    historyModal.style.zIndex = 'var(--z-layer-modal)';
-    historyModal.style.display = 'none';
-    historyModal.style.justifyContent = 'center';
-    historyModal.style.alignItems = 'center';
-    
-    const hContainer = document.createElement('div');
-    const isMobile = window.innerWidth <= 768;
-    hContainer.style.width = isMobile ? '95vw' : '80vw';
-    hContainer.style.height = isMobile ? '90vh' : '85vh';
-    hContainer.style.backgroundColor = '#ffffff';
-    hContainer.style.color = '#333333';
-    hContainer.style.borderRadius = '8px';
-    hContainer.style.padding = isMobile ? '40px 15px 15px 15px' : '30px'; 
-    hContainer.style.overflowY = 'auto';
-    hContainer.style.boxSizing = 'border-box';
-    hContainer.style.position = 'relative';
-    
-    // Create close button INSIDE the container so it never overlaps invisibly
-    const hCloseBtn = document.createElement('div');
-    hCloseBtn.innerHTML = '✕';
-    hCloseBtn.style.position = 'absolute';
-    hCloseBtn.style.top = isMobile ? '10px' : '15px';
-    hCloseBtn.style.right = isMobile ? '15px' : '20px';
-    hCloseBtn.style.color = '#999';
-    hCloseBtn.style.fontSize = '24px';
-    hCloseBtn.style.cursor = 'pointer';
-    hCloseBtn.style.zIndex = '9999';
-    hCloseBtn.onclick = () => {
-        historyModal.style.display = 'none';
-    };
-    
-    // Ensure mouse hover feedback
-    hCloseBtn.onmouseenter = () => hCloseBtn.style.color = '#333';
-    hCloseBtn.onmouseleave = () => hCloseBtn.style.color = '#999';
-    
-    hContainer.appendChild(hCloseBtn);
-    
-    historyModalContent = document.createElement('div');
-    historyModalContent.className = 'markdown-section'; // Inherit Docsify styles
-    hContainer.appendChild(historyModalContent);
-    historyModal.appendChild(hContainer);
-    
-    document.body.appendChild(historyModal);
-  }
-
-  function openTimelineDrawer() {
-    if (!drawer) initTimelineUI();
-    const title = drawer.querySelector('h3');
-    if (title && title.innerHTML.includes('全局')) {
-        if (window.loadPageHistory) window.loadPageHistory();
+    connectedCallback() {
+      this.render();
+      if (window.addToolbarButton) {
+        window.addToolbarButton('btn-git-timeline', '⏱️', 'History', this.openTimelineDrawer, 40);
+      }
+      
+      // Expose globally for things like explorer.js and sidebar-tabs.js
+      window.openTimelineDrawer = this.openTimelineDrawer;
+      window.loadGlobalHistory = this.loadGlobalHistory;
+      window.loadPageHistory = this.loadPageHistory;
     }
-    drawer.style.transform = 'translateX(0)';
-  }
 
-  function viewHistoricalCommit(hash, filePath, isSynced) {
-    historyModal.style.display = 'flex';
-    historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">加载历史版本 ' + hash + '...</h2>';
-    
-    fetch((window.HIBOOK_ROOT || '/') + '_api/file_at_commit?file=' + encodeURIComponent(filePath) + '&hash=' + hash)
-      .then(res => {
-         if (!res.ok) throw new Error('File not found in this commit');
-         return res.text();
-      })
-      .then(text => {
-         let actionsHtml = `<div style="margin-top: 10px; margin-bottom: 10px;">
-            <button id="btn-restore-version" style="padding: 6px 12px; cursor: pointer; background: #f39c12; color: white; border: none; border-radius: 4px; margin-right: 10px;">回滚到该次改动之前</button>`;
-         if (isSynced === 'false') {
-             actionsHtml += `<button id="btn-undo-commit" style="padding: 6px 12px; cursor: pointer; background: #e74c3c; color: white; border: none; border-radius: 4px;">抹掉该记录</button>`;
-         }
-         actionsHtml += `</div>`;
-         
-         let rendered = '';
-         if (window.marked && typeof window.marked === 'function') {
-             rendered = window.marked(text);
-         } else if (window.marked && typeof window.marked.parse === 'function') {
-             rendered = window.marked.parse(text);
-         } else {
-             rendered = '<pre style="white-space:pre-wrap; word-wrap:break-word; background:transparent;">' + 
-                        text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + 
-                        '</pre>';
-         }
-         
-         historyModalContent.innerHTML = 
-            '<div style="background:#fffae6; color:#856404; padding:10px; margin-bottom:20px; border-radius:4px; border:1px solid #ffeeba;">' +
-            '<strong>⚠️ 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' + actionsHtml +
-            '</div>' + rendered;
-            
-         // 手动接管 Mermaid 渲染
-         if (window.mermaid) {
-             const mermaidBlocks = historyModalContent.querySelectorAll('code.language-mermaid');
-             mermaidBlocks.forEach(block => {
-                 const pre = block.parentElement;
-                 if (pre && pre.tagName === 'PRE') {
-                     const div = document.createElement('div');
-                     div.className = 'mermaid';
-                     // 使用 textContent 自动提取转义前的纯文本
-                     div.textContent = block.textContent; 
-                     pre.replaceWith(div);
-                 }
-             });
-             try {
-                window.mermaid.init(undefined, historyModalContent.querySelectorAll('.mermaid'));
-             } catch (e) {
-                console.error("Mermaid History Render Error:", e);
-             }
-         }
-            
-         document.getElementById('btn-restore-version').onclick = () => {
-             if (confirm("确定要回滚文件内容吗？")) {
-                 fetch((window.HIBOOK_ROOT || '/') + '_api/save', {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify({ file: filePath, content: text, message: `回滚 ${filePath} 至历史状态 ${hash}` })
-                 }).then(r => r.json()).then(res => {
-                     if (res.success) { alert("回滚成功！"); window.location.reload(); }
-                     else { alert("操作失败: " + res.error); }
-                 });
-             }
-         };
-         
-         let undoBtn = document.getElementById('btn-undo-commit');
-         if (undoBtn) {
-             undoBtn.onclick = () => {
-                 if (confirm("确定要彻底抹掉该条历史记录吗？\n（危险操作：此操作类似 Reset，将从本地历史记录中彻底删除该节点，若与其他历史存在依赖冲突将自动终止该操作。）")) {
-                     fetch((window.HIBOOK_ROOT || '/') + '_api/drop_commit', {
+    render() {
+      const isMobile = window.innerWidth <= 768;
+      this.shadowRoot.innerHTML = `
+        <style>
+          #git-timeline-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 350px;
+            height: 100vh;
+            background-color: #fff;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            z-index: var(--z-layer-drawer, 1000);
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            font-family: var(--baseFontFamily, sans-serif);
+          }
+          @media (prefers-color-scheme: dark) {
+            #git-timeline-drawer { background-color: #1e1e1e; color: #fff; }
+          }
+          
+          #drawer-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 20px;
+          }
+          
+          #drawer-title {
+            margin-top: 0;
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 10px;
+          }
+          
+          #history-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0,0,0,0.85);
+            z-index: var(--z-layer-modal, 2000);
+            display: none;
+            justify-content: center;
+            align-items: center;
+          }
+          
+          #history-container {
+            width: ${isMobile ? '95vw' : '80vw'};
+            height: ${isMobile ? '90vh' : '85vh'};
+            background-color: #ffffff;
+            color: #333333;
+            border-radius: 8px;
+            padding: ${isMobile ? '40px 15px 15px 15px' : '30px'};
+            overflow-y: auto;
+            box-sizing: border-box;
+            position: relative;
+          }
+          
+          #history-close {
+            position: absolute;
+            top: ${isMobile ? '10px' : '15px'};
+            right: ${isMobile ? '15px' : '20px'};
+            color: #999;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 9999;
+          }
+          #history-close:hover { color: #333; }
+          
+          .timeline-node {
+            position: relative;
+            margin-bottom: 20px;
+            padding-left: 20px;
+            cursor: pointer;
+          }
+          .timeline-node:hover {
+            background-color: rgba(66, 185, 131, 0.1);
+          }
+          .timeline-dot {
+            position: absolute;
+            left: -7px;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #42b983;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px #eaecef;
+          }
+          
+          .markdown-section pre {
+             white-space: pre-wrap; word-wrap: break-word; background: transparent;
+             font-family: monospace;
+             background: #f8f9fa;
+             padding: 15px;
+             border-radius: 6px;
+             font-size: 13px;
+             border: 1px solid #ddd;
+             overflow-x: auto;
+          }
+        </style>
+        
+        <link rel="stylesheet" href="${window.HIBOOK_ROOT || '/'}.hibook_web/vue.css">
+        <link rel="stylesheet" href="${window.HIBOOK_ROOT || '/'}.hibook_web/custom.css">
+        <link rel="stylesheet" href="${window.HIBOOK_ROOT || '/'}.hibook_web/katex.min.css">
+
+        <div id="git-timeline-drawer">
+          <div id="drawer-close">✕</div>
+          <h3 id="drawer-title">⏱️ 变更时间线</h3>
+          <div id="git-timeline-content"><span style="color:#999">请打开或刷新页面加载历史...</span></div>
+        </div>
+
+        <div id="history-modal">
+          <div id="history-container">
+            <div id="history-close">✕</div>
+            <div id="history-content" class="markdown-section"></div>
+          </div>
+        </div>
+      `;
+
+      this.shadowRoot.getElementById('drawer-close').addEventListener('click', this.closeTimelineDrawer);
+      this.shadowRoot.getElementById('history-close').addEventListener('click', this.closeHistoryModal);
+    }
+
+    openTimelineDrawer() {
+      const title = this.shadowRoot.getElementById('drawer-title');
+      if (title && title.innerHTML.includes('全局')) {
+          this.loadPageHistory();
+      }
+      this.shadowRoot.getElementById('git-timeline-drawer').style.transform = 'translateX(0)';
+    }
+
+    closeTimelineDrawer() {
+      this.shadowRoot.getElementById('git-timeline-drawer').style.transform = 'translateX(100%)';
+    }
+
+    closeHistoryModal() {
+      this.shadowRoot.getElementById('history-modal').style.display = 'none';
+      this.shadowRoot.getElementById('history-content').innerHTML = '';
+    }
+
+    viewHistoricalCommit(hash, filePath, isSynced) {
+      const modal = this.shadowRoot.getElementById('history-modal');
+      const content = this.shadowRoot.getElementById('history-content');
+      
+      modal.style.display = 'flex';
+      content.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">加载历史版本 ' + hash + '...</h2>';
+      
+      fetch((window.HIBOOK_ROOT || '/') + '_api/file_at_commit?file=' + encodeURIComponent(filePath) + '&hash=' + hash)
+        .then(res => {
+           if (!res.ok) throw new Error('File not found in this commit');
+           return res.text();
+        })
+        .then(text => {
+           let actionsHtml = `<div style="margin-top: 10px; margin-bottom: 10px;">
+              <button id="btn-restore-version" style="padding: 6px 12px; cursor: pointer; background: #f39c12; color: white; border: none; border-radius: 4px; margin-right: 10px;">回滚到该次改动之前</button>`;
+           if (isSynced === 'false') {
+               actionsHtml += `<button id="btn-undo-commit" style="padding: 6px 12px; cursor: pointer; background: #e74c3c; color: white; border: none; border-radius: 4px;">抹掉该记录</button>`;
+           }
+           actionsHtml += `</div>`;
+           
+           let rendered = '';
+           if (window.marked && typeof window.marked === 'function') {
+               rendered = window.marked(text);
+           } else if (window.marked && typeof window.marked.parse === 'function') {
+               rendered = window.marked.parse(text);
+           } else {
+               rendered = '<pre>' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+           }
+           
+           content.innerHTML = 
+              '<div style="background:#fffae6; color:#856404; padding:10px; margin-bottom:20px; border-radius:4px; border:1px solid #ffeeba;">' +
+              '<strong>⚠️ 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' + actionsHtml +
+              '</div>' + rendered;
+              
+           // Shadow DOM compatible Mermaid rendering using explicit SVG generation APIs
+           if (window.mermaid) {
+               const mermaidBlocks = content.querySelectorAll('.mermaid');
+               mermaidBlocks.forEach((div, index) => {
+                   const graphDefinition = div.textContent;
+                   const uniqueId = 'mermaid-history-' + Date.now() + '-' + index;
+                   
+                   div.className = 'mermaid-history-container';
+                   div.innerHTML = '';
+                   div.style.textAlign = 'center';
+                   div.style.margin = '20px 0';
+                   
+                   try {
+                       // Mermaid v9 explicit render to SVG string bypassing global DOM queries
+                       window.mermaid.render(uniqueId, graphDefinition, (svgCode) => {
+                           div.innerHTML = svgCode;
+                       });
+                   } catch (e) {
+                       console.error("Mermaid History Render Error:", e);
+                       div.innerHTML = `<pre style="color:red; border:1px solid red; background:#ffeeee; text-align:left; padding:10px;">Error rendering diagram:\\n${e.message}</pre><pre style="text-align:left;">${graphDefinition}</pre>`;
+                   }
+               });
+           }
+              
+           let restoreBtn = this.shadowRoot.getElementById('btn-restore-version');
+           if (restoreBtn) {
+              restoreBtn.onclick = () => {
+                 if (confirm("确定要回滚文件内容吗？")) {
+                     fetch((window.HIBOOK_ROOT || '/') + '_api/save', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ hash: hash })
+                         body: JSON.stringify({ file: filePath, content: text, message: `回滚 ${filePath} 至历史状态 ${hash}` })
                      }).then(r => r.json()).then(res => {
-                         if (res.success) { alert("抹除该记录成功！"); window.location.reload(); }
+                         if (res.success) { alert("回滚成功！"); window.location.reload(); }
                          else { alert("操作失败: " + res.error); }
                      });
                  }
-             };
-         }
-      })
-      .catch(err => {
-         historyModalContent.innerHTML = '<h2 style="text-align:center;color:red;margin-top:20vh;">无法加载该历史版本</h2><p style="text-align:center;">' + err.message + '</p>';
-      });
-  }
+              };
+           }
+           
+           let undoBtn = this.shadowRoot.getElementById('btn-undo-commit');
+           if (undoBtn) {
+               undoBtn.onclick = () => {
+                   if (confirm("确定要彻底抹掉该条历史记录吗？\\n（危险操作：此操作类似 Reset，将从本地历史记录中彻底删除该节点，若与其他历史存在依赖冲突将自动终止该操作。）")) {
+                       fetch((window.HIBOOK_ROOT || '/') + '_api/drop_commit', {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ hash: hash })
+                       }).then(r => r.json()).then(res => {
+                           if (res.success) { alert("抹除该记录成功！"); window.location.reload(); }
+                           else { alert("操作失败: " + res.error); }
+                       });
+                   }
+               };
+           }
+        })
+        .catch(err => {
+           content.innerHTML = '<h2 style="text-align:center;color:red;margin-top:20vh;">无法加载该历史版本</h2><p style="text-align:center;">' + err.message + '</p>';
+        });
+    }
 
-  hook.mounted(function() {
-      initTimelineUI();
-      if (window.addToolbarButton) {
-          window.addToolbarButton('btn-git-timeline', '⏱️', 'History', openTimelineDrawer, 40);
-      }
-  });
-
-  let currentVmRouteFile = null;
-
-  function loadPageHistory() {
-      if (!currentVmRouteFile) return;
-      var container = document.getElementById('git-timeline-content');
+    loadPageHistory() {
+      if (!this.currentVmRouteFile) return;
+      const container = this.shadowRoot.getElementById('git-timeline-content');
       if (!container) return;
       
-      const title = drawer.querySelector('h3');
+      const title = this.shadowRoot.getElementById('drawer-title');
       if(title) title.innerHTML = '📄 页面变更时间线';
       
-      const currentFile = decodeURIComponent(currentVmRouteFile);
+      const currentFile = decodeURIComponent(this.currentVmRouteFile);
       container.innerHTML = '<span style="color:#999">加载中...</span>';
 
       fetch((window.HIBOOK_ROOT || '/') + '_api/history?file=' + encodeURIComponent(currentFile))
-      .then(function(response) {
+      .then(response => {
         if (!response.ok) throw new Error('API off or file not tracked');
         return response.json();
       })
-      .then(function(history) {
+      .then(history => {
         if (!history || history.length === 0) {
           container.innerHTML = '<span style="color:#999; font-size: 0.9em;">暂无 Git 变更记录。</span>';
           return;
         }
 
-        var listHtml = '<ul style="list-style:none; padding-left:0; border-left: 2px solid #eaecef; margin-left: 10px; margin-bottom: 0;">';
-        history.forEach(function(commit) {
+        let listHtml = '<ul style="list-style:none; padding-left:0; border-left: 2px solid #eaecef; margin-left: 10px; margin-bottom: 0;">';
+        history.forEach(commit => {
           let unsyncedTag = !commit.is_synced ? '<span style="color:#e67e22; font-weight:bold; margin-left:5px;">(Unsynced)</span>' : '';
-          listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" data-synced="' + commit.is_synced + '" style="position: relative; margin-bottom: 20px; padding-left: 20px; cursor: pointer;">' +
-                      '<div style="position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #42b983; border: 2px solid #fff; box-shadow: 0 0 0 1px #eaecef;"></div>' +
+          listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" data-synced="' + commit.is_synced + '">' +
+                      '<div class="timeline-dot"></div>' +
                       '<div style="font-size: 0.85em; color: #888; margin-bottom: 6px;">' +
                       '<strong style="color: #555;">' + commit.date + '</strong> • ' + commit.author + unsyncedTag + ' ' +
                       '<code style="background: #f1f1f1; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; margin-left: 5px; color:#333;">' + commit.hash + '</code>' +
@@ -250,35 +304,23 @@ function gitTimelinePlugin(hook, vm) {
         listHtml += '</ul>';
         container.innerHTML = listHtml;
         
-        // Add hover effects and click listeners
         const nodes = container.querySelectorAll('.timeline-node');
         nodes.forEach(node => {
-            node.onmouseenter = () => node.style.backgroundColor = 'rgba(66, 185, 131, 0.1)';
-            node.onmouseleave = () => node.style.backgroundColor = 'transparent';
-            node.onclick = () => viewHistoricalCommit(node.getAttribute('data-hash'), currentFile, node.getAttribute('data-synced'));
+            node.onclick = () => this.viewHistoricalCommit(node.getAttribute('data-hash'), currentFile, node.getAttribute('data-synced'));
         });
       })
-      .catch(function(err) {
+      .catch(err => {
         container.innerHTML = '<span style="color:#999; font-size: 0.9em;">无法获取时间线或无记录。</span>';
       });
-  }
+    }
 
-  hook.doneEach(function() {
-      if (vm.route.file) {
-          currentVmRouteFile = vm.route.file;
-          // Pre-load if drawer is open to keep it synced, but we can just always pre-load
-          loadPageHistory();
-      }
-  });
-
-  function loadGlobalHistory() {
-      if (!drawer) initTimelineUI();
-      drawer.style.transform = 'translateX(0)';
+    loadGlobalHistory() {
+      this.shadowRoot.getElementById('git-timeline-drawer').style.transform = 'translateX(0)';
       
-      const title = drawer.querySelector('h3');
+      const title = this.shadowRoot.getElementById('drawer-title');
       if(title) title.innerHTML = '🌍 全局时间线';
       
-      const container = document.getElementById('git-timeline-content');
+      const container = this.shadowRoot.getElementById('git-timeline-content');
       if (!container) return;
       
       container.innerHTML = '<span style="color:#999">抓取全局日志中...</span>';
@@ -291,11 +333,11 @@ function gitTimelinePlugin(hook, vm) {
               return;
             }
             
-            var listHtml = '<ul style="list-style:none; padding-left:0; border-left: 2px solid #eaecef; margin-left: 10px; margin-bottom: 0;">';
-            history.forEach(function(commit) {
+            let listHtml = '<ul style="list-style:none; padding-left:0; border-left: 2px solid #eaecef; margin-left: 10px; margin-bottom: 0;">';
+            history.forEach(commit => {
               let unsyncedTag = !commit.is_synced ? '<span style="color:#e67e22; font-weight:bold; margin-left:5px;">(Unsynced)</span>' : '';
-              listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" data-synced="' + commit.is_synced + '" style="position: relative; margin-bottom: 20px; padding-left: 20px; cursor: pointer;">' +
-                          '<div style="position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #42b983; border: 2px solid #fff; box-shadow: 0 0 0 1px #eaecef;"></div>' +
+              listHtml += '<li class="timeline-node" data-hash="' + commit.hash + '" data-synced="' + commit.is_synced + '">' +
+                          '<div class="timeline-dot"></div>' +
                           '<div style="font-size: 0.85em; color: #888; margin-bottom: 6px;">' +
                           '<strong style="color: #555;">' + commit.date + '</strong> • ' + commit.author + unsyncedTag + ' ' +
                           '<code style="background: #f1f1f1; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; margin-left: 5px; color:#333;">' + commit.hash + '</code>' +
@@ -308,18 +350,18 @@ function gitTimelinePlugin(hook, vm) {
             
             const nodes = container.querySelectorAll('.timeline-node');
             nodes.forEach(node => {
-                node.onmouseenter = () => node.style.backgroundColor = 'rgba(66, 185, 131, 0.1)';
-                node.onmouseleave = () => node.style.backgroundColor = 'transparent';
                 node.onclick = () => {
                    const hash = node.getAttribute('data-hash');
-                   historyModal.style.display = 'flex';
-                   historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">获取 '+hash+' 全局改动中...</h2>';
+                   const modal = this.shadowRoot.getElementById('history-modal');
+                   const content = this.shadowRoot.getElementById('history-content');
+                   
+                   modal.style.display = 'flex';
+                   content.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">获取 '+hash+' 全局改动中...</h2>';
+                   
                    fetch((window.HIBOOK_ROOT || '/') + '_api/commit_info?hash=' + hash)
                      .then(r => r.json())
                      .then(data => {
-                         let diffHtml = '<pre style="white-space:pre-wrap; background:#f8f9fa; padding:15px; border-radius:6px; font-size:12px; font-family:monospace; border:1px solid #ddd; overflow-x:auto;">' + 
-                                        data.diff.replace(/</g, '&lt;').replace(/>/g, '&gt;') + 
-                                        '</pre>';
+                         let diffHtml = '<pre>' + data.diff.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
                          
                          let actionsHtml = `<div style="margin-top: 10px; margin-bottom: 15px;">`;
                          actionsHtml += `<button id="btn-revert-global" style="padding: 6px 12px; cursor: pointer; background: #f39c12; color: white; border: none; border-radius: 4px; margin-right: 10px;">回滚全库至此时刻</button>`;
@@ -328,15 +370,15 @@ function gitTimelinePlugin(hook, vm) {
                          }
                          actionsHtml += `</div>`;
                          
-                         historyModalContent.innerHTML = 
+                         content.innerHTML = 
                             '<div style="background:#eaf2ff; color:#0e5a97; padding:10px; margin-bottom:10px; border-radius:4px; border:1px solid #b8daff;">' +
                             '<strong>🌍 全局 Commit (只读)</strong> - <code>' + hash + '</code> 时刻的详细变动。' + actionsHtml +
                             '</div>' + diffHtml;
                             
-                         let revertBtn = document.getElementById('btn-revert-global');
+                         let revertBtn = this.shadowRoot.getElementById('btn-revert-global');
                          if (revertBtn) {
                              revertBtn.onclick = () => {
-                                 if (confirm(`超级警告：确定要将【整个知识库】强制回滚至 ${hash} 的状态吗？\n所有未提交的更改将被丢弃。`)) {
+                                 if (confirm(`超级警告：确定要将【整个知识库】强制回滚至 ${hash} 的状态吗？\\n所有未提交的更改将被丢弃。`)) {
                                      fetch((window.HIBOOK_ROOT || '/') + '_api/revert_global', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
@@ -349,10 +391,10 @@ function gitTimelinePlugin(hook, vm) {
                              };
                          }
 
-                         let undoBtn = document.getElementById('btn-undo-global-commit');
+                         let undoBtn = this.shadowRoot.getElementById('btn-undo-global-commit');
                          if (undoBtn) {
                              undoBtn.onclick = () => {
-                                 if (confirm("确定要彻底抹掉这条全局历史记录吗？\n这是高危操作，将放弃本次提价！")) {
+                                 if (confirm("确定要彻底抹掉这条全局历史记录吗？\\n这是高危操作，将放弃本次提价！")) {
                                      fetch((window.HIBOOK_ROOT || '/') + '_api/drop_commit', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
@@ -366,7 +408,7 @@ function gitTimelinePlugin(hook, vm) {
                          }
                      })
                      .catch(e => {
-                         historyModalContent.innerHTML = '<h2 style="text-align:center;color:red;margin-top:20vh;">无法加载全局 Diff</h2><p>'+e.message+'</p>';
+                         content.innerHTML = '<h2 style="text-align:center;color:red;margin-top:20vh;">无法加载全局 Diff</h2><p>'+e.message+'</p>';
                      });
                 };
             });
@@ -374,13 +416,31 @@ function gitTimelinePlugin(hook, vm) {
         .catch(err => {
             container.innerHTML = '<span style="color:#999; font-size: 0.9em;">获取全局历史失败。</span>';
         });
+    }
   }
 
-  // Expose methods globally
-  window.openTimelineDrawer = openTimelineDrawer;
-  window.loadGlobalHistory = loadGlobalHistory;
-  window.loadPageHistory = loadPageHistory;
-}
+  customElements.define('hi-git-timeline', HiGitTimeline);
 
-window.$docsify = window.$docsify || {};
-window.$docsify.plugins = (window.$docsify.plugins || []).concat(gitTimelinePlugin);
+  // Docsify Plugin Hooking
+  function gitTimelinePlugin(hook, vm) {
+    hook.mounted(() => {
+        let el = document.querySelector('hi-git-timeline');
+        if (!el) {
+            el = document.createElement('hi-git-timeline');
+            document.body.appendChild(el);
+        }
+    });
+
+    hook.doneEach(() => {
+        let el = document.querySelector('hi-git-timeline');
+        if (el && vm.route.file) {
+            el.currentVmRouteFile = vm.route.file;
+            el.loadPageHistory(); // sync timeline for the new page
+        }
+    });
+  }
+
+  window.$docsify = window.$docsify || {};
+  window.$docsify.plugins = (window.$docsify.plugins || []).concat(gitTimelinePlugin);
+
+})();

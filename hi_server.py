@@ -181,6 +181,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
         route_name, path, physical_dir = get_routing_context(parsed_url.path)
+        print(f"DEBUG GET: {self.path} -> {route_name}, '{path}'")
         
         # Bind the thread-safe routing context so all subprocesses and get_cwd() operate transparently within this specific KB.
         _route_context.cwd = physical_dir
@@ -199,8 +200,11 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             # Remove leading slash from file_path if present so git can find it correctly relative to cwd
             file_path = file_path.lstrip('/')
             
+            # Bind evaluation cleanly to the multiplexed workspace routing origin
+            abs_file_path = os.path.join(physical_dir, file_path) if file_path else physical_dir
+            
             # If file_path is empty, we do a global repo history fetch
-            if file_path and not os.path.exists(file_path):
+            if file_path and not os.path.exists(abs_file_path):
                 self.send_error(404, "File not found")
                 return
                 
@@ -209,12 +213,12 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     cmd = ['git', 'log', '--pretty=format:%h|%an|%ad|%s', '--date=short', '-n', '50']
                 else:
                     cmd = ['git', 'log', '--pretty=format:%h|%an|%ad|%s', '--date=short', '--', file_path]
-                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True, cwd=physical_dir)
                 
                 # Fetch unsynced hashes safely
                 unsynced = set()
                 try:
-                    unsynced_out = subprocess.check_output(['git', 'log', '@{u}..HEAD', '--format=%h'], stderr=subprocess.DEVNULL, text=True)
+                    unsynced_out = subprocess.check_output(['git', 'log', '@{u}..HEAD', '--format=%h'], stderr=subprocess.DEVNULL, text=True, cwd=physical_dir)
                     unsynced = set(unsynced_out.strip().split('\n'))
                 except Exception:
                     pass
@@ -248,13 +252,14 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             file_path = query.get('file', [''])[0].lstrip('/')
             commit_hash = query.get('hash', [''])[0]
             
-            if not file_path or not commit_hash or not os.path.exists(file_path):
+            abs_file_path = os.path.join(physical_dir, file_path) if file_path else physical_dir
+            if not file_path or not commit_hash or not os.path.exists(abs_file_path):
                 self.send_error(404, "File not found or missing parameters")
                 return
                 
             try:
                 cmd = ['git', 'show', f'{commit_hash}:{file_path}']
-                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, cwd=physical_dir)
                 
                 self.send_response(200)
                 self.send_header("Content-type", "text/markdown; charset=utf-8")
@@ -987,6 +992,22 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 def cmd_start(args):
     port = args.get("port")
     port = int(port) if port else 3000
+    
+    try:
+        from hi_config import HiConfig
+        from hi_search import SearchManager
+        saved_workspaces = HiConfig.get_workspaces()
+        restored_count = 0
+        for ws in saved_workspaces:
+            if os.path.exists(ws['path']):
+                ROUTE_MAP[ws['name']] = ws['path']
+                SearchManager.get_instance(ws['path']).start_background_sync()
+                restored_count += 1
+        if restored_count > 0:
+            HiLog.info(f"Restored {restored_count} workspaces from configuration.")
+    except Exception as e:
+        HiLog.warning(f"Could not restore workspaces: {e}")
+
     HiLog.info(f"Starting Hibook Global Multiplexing Hub on port {port}...")
     HiLog.info(f"Hub Dashboard available at http://localhost:{port}/")
     HiLog.info("Press Ctrl+C to stop.")

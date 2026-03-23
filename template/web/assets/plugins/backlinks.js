@@ -52,8 +52,9 @@
               snippet.style.margin = '10px 0 0 0';
               snippet.style.borderLeft = '3px solid var(--theme-color, #42b983)';
               snippet.style.paddingLeft = '10px';
-              // Add simple bolding for the matched text
-              const boldedSnippet = link.snippet.replace(new RegExp(link.text, 'g'), `<strong>${link.text}</strong>`);
+              // Safe substring replacement bypassing RegExp entirely
+              const parts = link.snippet.split(link.text);
+              const boldedSnippet = parts.join(`<strong>${link.text}</strong>`);
               snippet.innerHTML = '... ' + boldedSnippet + ' ...';
               li.appendChild(snippet);
             }
