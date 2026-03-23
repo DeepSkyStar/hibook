@@ -1,13 +1,13 @@
 :root {
-    --bg-base: #0f172a;
-    --bg-glass: rgba(30, 41, 59, 0.7);
-    --bg-card: rgba(30, 41, 59, 0.4);
-    --border-glass: rgba(255, 255, 255, 0.08);
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --accent-primary: #3b82f6;
-    --accent-hover: #2563eb;
-    --accent-glow: rgba(59, 130, 246, 0.5);
+    --bg-base: #ffffff;
+    --bg-glass: #ffffff;
+    --bg-card: #ffffff;
+    --border-glass: rgba(0, 0, 0, 0.07);
+    --text-main: #34495e;
+    --text-muted: #505d6b;
+    --accent-primary: #42b983;
+    --accent-hover: #359368;
+    --accent-glow: rgba(66, 185, 131, 0.2);
     --danger: #ef4444;
 }
 
@@ -20,10 +20,6 @@
 
 body {
     background-color: var(--bg-base);
-    background-image: 
-        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
-    background-attachment: fixed;
     color: var(--text-main);
     display: flex;
     justify-content: center;
@@ -37,43 +33,53 @@ body {
     height: 100vh;
     display: flex;
     background: var(--bg-glass);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border-right: 1px solid var(--border-glass);
 }
 
 .sidebar {
-    width: 280px;
-    background: rgba(15, 23, 42, 0.4);
+    width: 300px;
+    background: #fafafa;
     border-right: 1px solid var(--border-glass);
     display: flex;
     flex-direction: column;
     padding: 24px 16px;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.sidebar.sidebar-closed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right: none;
 }
 
 .sidebar-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 40px;
-    padding: 0 8px;
+    margin-top: 60px;
+    margin-bottom: 24px;
 }
 
 .logo-circle {
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent-primary), #8b5cf6);
+    background: var(--accent-primary);
+    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    justify-self: end;
+    margin-right: 12px;
 }
 
 .sidebar-header h2 {
     font-size: 1.25rem;
     font-weight: 600;
     letter-spacing: -0.02em;
+    grid-column: 2;
 }
 
 .nav-menu {
@@ -147,14 +153,15 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 32px 48px;
+    padding: 32px 48px 32px 80px; /* Safe harbor for left fixed 40px hamburger toggle */
     overflow-y: auto;
 }
 
 .top-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
     margin-bottom: 40px;
 }
 
@@ -162,17 +169,75 @@ body {
     font-size: 2rem;
     font-weight: 700;
     letter-spacing: -0.03em;
+    color: var(--text-main);
+}
+
+.sidebar-toggle {
+    width: 38px;
+    height: 38px;
+    background-color: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-radius: 50%;
+    border: 1px solid #eee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: fixed;
+    top: 15px;
+    left: 20px;
+    z-index: 1000;
+    transition: transform 0.2s, left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-toggle:hover {
+    transform: scale(1.05);
+}
+
+.hi-floating-toolbar {
+    position: fixed;
+    top: 15px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 30px;
+    padding: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    z-index: 2000;
+    gap: 2px;
+}
+
+.hi-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s;
+}
+
+.hi-toolbar-btn:hover {
+    background: #f1f5f9;
+    color: var(--accent-primary);
 }
 
 .search-bar {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid var(--border-glass);
+    background: #f4f4f5; /* Light gray theme */
+    border: 1px solid #e4e4e7;
     padding: 10px 16px;
     border-radius: 12px;
     width: 300px;
+    color: var(--text-muted);
     transition: all 0.2s ease;
 }
 
@@ -191,7 +256,7 @@ body {
 }
 
 .search-bar input::placeholder {
-    color: var(--text-muted);
+    color: #a1a1aa;
 }
 
 .workspace-grid {
@@ -208,6 +273,9 @@ body {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
 }
 
 .ws-card::before {
@@ -244,6 +312,7 @@ body {
 .ws-actions {
     display: flex;
     gap: 8px;
+    margin-top: auto;
 }
 
 .btn-open {
@@ -253,16 +322,16 @@ body {
 .btn-export {
     padding: 12px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.05);
+    background: #f8fafc;
     border: 1px solid var(--border-glass);
-    color: var(--text-main);
+    color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .btn-export:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #60a5fa;
+    background: #f1f5f9;
+    color: var(--accent-primary);
 }
 
 /* Modals */
@@ -278,12 +347,12 @@ body {
 }
 
 .modal-card {
-    background: #1e293b;
+    background: #ffffff;
     border: 1px solid var(--border-glass);
     border-radius: 16px;
     width: 400px;
     padding: 32px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.1);
 }
 
 .scale-in {
@@ -334,7 +403,7 @@ body {
     width: 100%;
     padding: 12px 16px;
     border-radius: 10px;
-    background: rgba(15, 23, 42, 0.6);
+    background: #fafafa;
     border: 1px solid var(--border-glass);
     color: var(--text-main);
     font-size: 1rem;

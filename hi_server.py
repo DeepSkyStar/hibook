@@ -720,15 +720,23 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 
         if path == '/_api/desktop/export':
             name = req.get("name", "")
+            export_name = req.get("exportName", "").strip() or "export"
+            export_path = req.get("exportPath", "").strip()
+            
             from hi_config import HiConfig
             kbs = HiConfig.get_workspaces()
             target_path = next((kb['path'] for kb in kbs if kb['name'] == name), None)
             
             if target_path and os.path.exists(target_path):
                 try:
+                    if export_path:
+                        output_dir = os.path.join(export_path, export_name)
+                    else:
+                        output_dir = os.path.join(os.path.dirname(target_path), export_name)
+                        
                     import hi_export
-                    hi_export.cmd_export(target_path)
-                    return send_json({"success": True})
+                    hi_export.cmd_export(target_path, output_dir)
+                    return send_json({"success": True, "path": output_dir})
                 except Exception as e:
                     return send_json({"success": False, "error": str(e)}, 500)
             return send_json({"success": False, "error": "Workspace not found"}, 404)

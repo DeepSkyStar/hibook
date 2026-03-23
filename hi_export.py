@@ -121,14 +121,15 @@ def read_file_content(file_path, root_dir):
         content = f.read()
     return content
 
-def cmd_export(args):
-    root_dir = os.getcwd()
+def cmd_export(target_dir=None, output_dir=None):
+    root_dir = target_dir if target_dir else os.getcwd()
     summary_path = os.path.join(root_dir, 'SUMMARY.md')
     if not os.path.exists(summary_path):
         HiLog.error(f"Cannot find SUMMARY.md in {root_dir}")
         return
         
-    output_dir = os.path.join(root_dir, 'export')
+    if not output_dir:
+        output_dir = os.path.join(root_dir, 'export')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         

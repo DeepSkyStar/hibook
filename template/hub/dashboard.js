@@ -38,6 +38,12 @@ function closeModals() {
     document.getElementById('clone-name').value = '';
     document.getElementById('import-path').value = '';
     document.getElementById('import-name').value = '';
+    
+    // Export Modal resets
+    const exportName = document.getElementById('export-name');
+    if(exportName) exportName.value = '';
+    const exportPath = document.getElementById('export-path');
+    if(exportPath) exportPath.value = '';
 }
 
 async function fetchJSON(url, options = {}) {
@@ -197,14 +203,42 @@ async function stopWorkspace(name) {
     }
 }
 
-async function exportWorkspace(name, path) {
+function exportWorkspace(name) {
+    const modal = document.getElementById('export-modal');
+    if(modal) {
+        modal.style.display = 'flex';
+        document.getElementById('export-alias').value = name;
+    }
+}
+
+async function submitExport() {
+    const name = document.getElementById('export-alias').value;
+    const exportName = document.getElementById('export-name').value.trim();
+    const exportPath = document.getElementById('export-path').value.trim();
+    
+    const btn = document.querySelector('#export-modal .btn-primary');
     try {
+        btn.innerText = "Exporting Workspace..."; 
+        btn.disabled = true;
+        
         const res = await fetchJSON('/_api/desktop/export', {
-            method: 'POST', body: JSON.stringify({name})
+            method: 'POST', 
+            body: JSON.stringify({
+                name: name,
+                exportName: exportName,
+                exportPath: exportPath
+            })
         });
-        if (res.success) alert("Export Completed to _export folder.");
+        
+        closeModals();
+        if (res.success) {
+            alert("Export Completed to: " + res.path);
+        }
     } catch (err) {
         alert("Export failed: " + err.message);
+    } finally {
+        btn.innerText = "Start Export"; 
+        btn.disabled = false;
     }
 }
 
@@ -281,3 +315,12 @@ async function saveSettings() {
     // Notify user to restart manually since we can't reliably hot-swap the root listening port safely from the browser
     alert("Port saved logic is restricted in the Hub. Please restart the daemon using 'hibook stop' then 'hibook start -p " + port + "'.");
 }
+
+// Sidebar Toggle Logic
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('sidebar-closed');
+    }
+}
+window.toggleSidebar = toggleSidebar;
