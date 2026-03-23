@@ -24,7 +24,7 @@
 * **`hi_server.py`**: 核心后台守护进程（Daemon）。基于多路复用（Multiplexing）架构，全机器上仅需占用并监听一个固定端口（默认 3000）。通过动态的 URL 前缀命名空间（如 `/kb_name/`）进行多知识库的路由隔离与 API 沙盒限定。根路径 `/` 原生托管聚合所有激活空间状态的 **Web Dashboard Hub**。
 * **`hi_export.py`**: 负责系统级的离线导出及静态文件的硬编排能力。
 * **`hi_search.py` (新增)**: 全局 SQLite 收录与检索引擎，在各个工作区的沙箱内利用原生 `sqlite3` 提供毫秒级全文检索。
-* **`template/web/assets/`**: 知识界面（阅读器、编辑器、图谱）的实体承载区，前端逻辑彻底插件化并收敛于独立的 `.js` 中，绝不在 `.html` 里写入大段脏逻辑。依赖原生 `fetch` 与 `hi_server` 的 `_api/` 端点通信进行读写。
+* **`template/web/assets/`**: 知识界面（阅读器、编辑器、图谱）的实体承载区。前端逻辑**彻底抛弃全局函数污染**，全面进化为 Web Components (`<hi-explorer>`, `<hi-editor>`, `<hi-git-timeline>`)。隔离的 Shadow DOM 配合独立加载的 `.css` 样式实现了浏览器原生的零依赖模块化。依赖原生 `fetch` 与 `hi_server` 的 `_api/` 端点通信进行增删改查。
 * **`template/hub/` (新增)**: Web Dashboard Hub 的前端承载面，直接被 `hi_server.py` 在根目录渲染，负责整体仓库面板的发起调用、路径注册与销毁等聚合管理任务。
 
 ---

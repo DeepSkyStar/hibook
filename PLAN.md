@@ -64,6 +64,6 @@
 ## Phase 5: Frontend Spaghetti Eradication (Zero-Dependency Modularization)
 *在坚持“零外部构建工具”（不引入 NPM / Vite）的前提下，实现前端视图层代码的现代化重构。*
 
-- **Status:** **Planning**
+- **Status:** **Completed**
 - **Goal:** Tame the growing complexity of frontend DOM manipulation (`dashboard.js`, `hi_mermaid.js`, etc) without introducing external build step dependencies.
 - **Strategy:** Migrating from pure global script-tag monolithic code to **Native Browser ES Modules (`<script type="module">`)**. Isolating UI features strictly using raw **Web Components (`customElements.define`)** accompanied by Shadow DOM for style/event encapsulation. This guarantees our zero-dependency geek philosophy while curing the spaghetti lifecycle nightmare natively within the browser.

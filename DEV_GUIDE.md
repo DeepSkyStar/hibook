@@ -34,3 +34,15 @@
 **严重后果**：点击插件按钮的一瞬间，侧边栏直接原地消失，而且按键触发事件极易错发或被屏蔽。
 **铁律 (The Absolute Rule)**：
 * 必须在事件的【捕获阶段】 (Capture Phase) 正确拦截冒泡。我们在 `index.html` 的底层引入了一个专属的 **Mobile Sidebar Shield (移动端侧栏护盾)**，监听了 MutationObserver。在触发我们的专属自定义功能期间，利用该“护盾”强行阻止被剥夺 `.close` 样式，保证自定义组件生命周期安全。
+
+## 6. JavaScript 正则特权注入字面量崩溃 (RegExp Injection Crash Sequence)
+**踩坑原由**：在实现 `backlinks.js` 词条高亮效果时，我们直接把提取出的 `link.text`（如带有特殊格式标记的 `**存在论**`）塞进了 `new RegExp(link.text, 'g')` 当中。
+**严重后果**：Markdown 特有的星号、中括号等在 JavaScript 引擎中被解释为不合法的正则表达式控制符（如 `Nothing to repeat`），当场触发 Parser 崩溃挂起，导致相关联的渲染队列全部死锁停止。
+**铁律 (The Absolute Rule)**：
+* 对于不受控的基础高亮或 DOM 操作，**绝对避免使用动态的 RegExp 构建器**。必须善用原生的无害字符串打断法 `split() + join()`，或者使用专门设计的 Regex 正交转义函数来确保沙箱隔离。
+
+## 7. Docsify marked 解析器提前篡改 DOM 序列 (Docsify Pre-Parsed DOM Overrides)
+**踩坑原由**：在重构 `git-timeline.js` 的独立历史展示 Modal 时，我们利用 `marked.parse()` 解析旧版文本，并通过查找 `<code class="language-mermaid">` 块来分离出流程图源码喂给 Mermaid。
+**严重后果**：`0` 个节点被渲染成功。原因在于，Docsify 绑定的 marked compiler 是被魔改过的，全局配置一旦启用，原生的 ````mermaid` 会在语法树阶段被**强制截断并变异**为 `<div class="mermaid">` 而再也不是 `code` 块，导致选择器失效。
+**铁律 (The Absolute Rule)**：
+* 不要凭借基础 Markdown 解析经验主观猜想 Docsify 的最终输出结构。所有的挂载操作、钩子定位都应当以真实编译出的 Node Lists 为准。
