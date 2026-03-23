@@ -121,7 +121,7 @@ function gitTimelinePlugin(hook, vm) {
     historyModal.style.display = 'flex';
     historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">加载历史版本 ' + hash + '...</h2>';
     
-    fetch('/_api/file_at_commit?file=' + encodeURIComponent(filePath) + '&hash=' + hash)
+    fetch((window.HIBOOK_ROOT || '/') + '_api/file_at_commit?file=' + encodeURIComponent(filePath) + '&hash=' + hash)
       .then(res => {
          if (!res.ok) throw new Error('File not found in this commit');
          return res.text();
@@ -172,7 +172,7 @@ function gitTimelinePlugin(hook, vm) {
             
          document.getElementById('btn-restore-version').onclick = () => {
              if (confirm("确定要回滚文件内容吗？")) {
-                 fetch('/_api/save', {
+                 fetch((window.HIBOOK_ROOT || '/') + '_api/save', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
                      body: JSON.stringify({ file: filePath, content: text, message: `回滚 ${filePath} 至历史状态 ${hash}` })
@@ -187,7 +187,7 @@ function gitTimelinePlugin(hook, vm) {
          if (undoBtn) {
              undoBtn.onclick = () => {
                  if (confirm("确定要彻底抹掉该条历史记录吗？\n（危险操作：此操作类似 Reset，将从本地历史记录中彻底删除该节点，若与其他历史存在依赖冲突将自动终止该操作。）")) {
-                     fetch('/_api/drop_commit', {
+                     fetch((window.HIBOOK_ROOT || '/') + '_api/drop_commit', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify({ hash: hash })
@@ -224,7 +224,7 @@ function gitTimelinePlugin(hook, vm) {
       const currentFile = decodeURIComponent(currentVmRouteFile);
       container.innerHTML = '<span style="color:#999">加载中...</span>';
 
-      fetch('/_api/history?file=' + encodeURIComponent(currentFile))
+      fetch((window.HIBOOK_ROOT || '/') + '_api/history?file=' + encodeURIComponent(currentFile))
       .then(function(response) {
         if (!response.ok) throw new Error('API off or file not tracked');
         return response.json();
@@ -283,7 +283,7 @@ function gitTimelinePlugin(hook, vm) {
       
       container.innerHTML = '<span style="color:#999">抓取全局日志中...</span>';
       
-      fetch('/_api/history?file=')
+      fetch((window.HIBOOK_ROOT || '/') + '_api/history?file=')
         .then(res => res.json())
         .then(history => {
             if (!history || history.length === 0) {
@@ -314,7 +314,7 @@ function gitTimelinePlugin(hook, vm) {
                    const hash = node.getAttribute('data-hash');
                    historyModal.style.display = 'flex';
                    historyModalContent.innerHTML = '<h2 style="text-align:center;color:#999;margin-top:20vh;">获取 '+hash+' 全局改动中...</h2>';
-                   fetch('/_api/commit_info?hash=' + hash)
+                   fetch((window.HIBOOK_ROOT || '/') + '_api/commit_info?hash=' + hash)
                      .then(r => r.json())
                      .then(data => {
                          let diffHtml = '<pre style="white-space:pre-wrap; background:#f8f9fa; padding:15px; border-radius:6px; font-size:12px; font-family:monospace; border:1px solid #ddd; overflow-x:auto;">' + 
@@ -337,7 +337,7 @@ function gitTimelinePlugin(hook, vm) {
                          if (revertBtn) {
                              revertBtn.onclick = () => {
                                  if (confirm(`超级警告：确定要将【整个知识库】强制回滚至 ${hash} 的状态吗？\n所有未提交的更改将被丢弃。`)) {
-                                     fetch('/_api/revert_global', {
+                                     fetch((window.HIBOOK_ROOT || '/') + '_api/revert_global', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
                                          body: JSON.stringify({ hash: hash })
@@ -353,7 +353,7 @@ function gitTimelinePlugin(hook, vm) {
                          if (undoBtn) {
                              undoBtn.onclick = () => {
                                  if (confirm("确定要彻底抹掉这条全局历史记录吗？\n这是高危操作，将放弃本次提价！")) {
-                                     fetch('/_api/drop_commit', {
+                                     fetch((window.HIBOOK_ROOT || '/') + '_api/drop_commit', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
                                          body: JSON.stringify({ hash: hash })

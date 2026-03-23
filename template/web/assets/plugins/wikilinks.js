@@ -12,7 +12,7 @@
       const placeholders = document.querySelectorAll('.wikilink-placeholder');
       if (placeholders.length === 0) return;
 
-      fetch('/_api/graph')
+      fetch((window.HIBOOK_ROOT || '/') + '_api/graph')
         .then(response => response.json())
         .then(data => {
           const basenameToId = {};

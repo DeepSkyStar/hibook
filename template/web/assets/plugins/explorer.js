@@ -194,7 +194,7 @@
 
     function moveItem(oldPath, newPath) {
         if (oldPath === newPath) return;
-        fetch('/_api/fs/rename', {
+        fetch((window.HIBOOK_ROOT || '/') + '_api/fs/rename', {
             method: 'POST',
             body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
             headers: { 'Content-Type': 'application/json' }
@@ -228,7 +228,7 @@
         
         let targetPath = parentPath ? parentPath + '/' + name : name;
         
-        fetch('/_api/fs/create', {
+        fetch((window.HIBOOK_ROOT || '/') + '_api/fs/create', {
             method: 'POST',
             body: JSON.stringify({ path: targetPath, is_dir: type === 'folder' }),
             headers: { 'Content-Type': 'application/json' }
@@ -259,7 +259,7 @@
     function deleteNode(item) {
         if (!confirm(`Are you sure you want to delete ${item.name}? This cannot be undone in the UI (but is in Git).`)) return;
         
-        fetch('/_api/fs/delete', {
+        fetch((window.HIBOOK_ROOT || '/') + '_api/fs/delete', {
             method: 'POST',
             body: JSON.stringify({ path: item.path }),
             headers: { 'Content-Type': 'application/json' }
@@ -340,8 +340,8 @@
 
     function loadTree() {
         Promise.all([
-            fetch('/_api/tree').then(res => res.json()),
-            fetch('/_api/status').then(res => res.json()).catch(() => ({}))
+            fetch((window.HIBOOK_ROOT || '/') + '_api/tree').then(res => res.json()),
+            fetch((window.HIBOOK_ROOT || '/') + '_api/status').then(res => res.json()).catch(() => ({}))
         ]).then(([tree, status]) => {
             treeData = tree;
             gitStatusData = status.files || {};
@@ -404,7 +404,7 @@
              btnSave.style.display = 'none';
              btnDiscard.style.display = 'none';
              btnSave.innerText = '⏳ 正在保存...';
-             fetch('/_api/save_all', { method: 'POST', body: JSON.stringify({ message: msg }), headers: {'Content-Type':'application/json'}})
+             fetch((window.HIBOOK_ROOT || '/') + '_api/save_all', { method: 'POST', body: JSON.stringify({ message: msg }), headers: {'Content-Type':'application/json'}})
              .then(res => res.json()).then(data => {
                   btnSave.innerText = '✅ 保存外部更改';
                   if(data.success) {
@@ -419,7 +419,7 @@
              
              btnSave.style.display = 'none';
              btnDiscard.style.display = 'none';
-             fetch('/_api/discard_all', { method: 'POST' })
+             fetch((window.HIBOOK_ROOT || '/') + '_api/discard_all', { method: 'POST' })
              .then(res => res.json()).then(data => {
                   if(data.success) {
                       // Reload the entire window to ensure the current markdown file view is refreshed with the clean git state

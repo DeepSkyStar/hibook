@@ -255,7 +255,7 @@
              selectFolder.style.width = '100%'; selectFolder.style.marginBottom = '20px'; selectFolder.style.padding = '6px';
              
              // Fetch tree
-             fetch('/_api/tree').then(res => res.json()).then(data => {
+             fetch((window.HIBOOK_ROOT || '/') + '_api/tree').then(res => res.json()).then(data => {
                  const folders = ['']; // root
                  function extractFolders(items, prefix) {
                      items.forEach(item => {
@@ -291,7 +291,7 @@
                  btnSubmit.innerText = '正在创建...';
                  btnSubmit.disabled = true;
                  
-                 fetch('/_api/fs/create', {
+                 fetch((window.HIBOOK_ROOT || '/') + '_api/fs/create', {
                      method: 'POST',
                      body: JSON.stringify({ path: targetPath, is_dir: false, append_summary: true, title: name }),
                      headers: { 'Content-Type': 'application/json' }

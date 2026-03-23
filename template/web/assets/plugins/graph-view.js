@@ -92,7 +92,7 @@
     
     myChart.showLoading({ color: '#42b983', textColor: '#333', maskColor: 'rgba(255,255,255,0.8)' });
     
-    fetch('/_api/graph')
+    fetch((window.HIBOOK_ROOT || '/') + '_api/graph')
       .then(res => res.json())
       .then(data => {
         myChart.hideLoading();

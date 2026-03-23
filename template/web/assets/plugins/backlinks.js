@@ -6,7 +6,7 @@
       const file = vm.route.file; 
       if (!file) return;
 
-      fetch(`/_api/backlinks?file=${encodeURIComponent(file)}`)
+      fetch((window.HIBOOK_ROOT || '/') + `_api/backlinks?file=${encodeURIComponent(file)}`)
         .then(response => response.json())
         .then(links => {
           if (!links || links.length === 0) return;

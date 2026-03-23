@@ -10,9 +10,52 @@ import re
 import subprocess
 import json
 from hi_basic import *
+from hi_basic import HiLog
 import time as _time
 from hi_search import SearchManager
 import hi_export
+import threading
+
+# Dynamic Webview Multiplexing Router
+HUB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template', 'hub')
+
+ROUTE_MAP = {
+    '': HUB_DIR # Default route always points to the native Hub UI
+}
+
+_route_context = threading.local()
+
+def get_routing_context(url_path):
+    parts = url_path.strip('/').split('/', 1)
+    if parts and parts[0] in ROUTE_MAP and parts[0] != '':
+        route_name = parts[0]
+        remaining_path = '/' + (parts[1] if len(parts) > 1 else '')
+        return route_name, remaining_path, ROUTE_MAP[route_name]
+    return '', url_path, ROUTE_MAP.get('', os.getcwd())
+
+# Thread-safe transparent process virtualization
+_original_run = subprocess.run
+_original_check_output = subprocess.check_output
+_original_check_call = subprocess.check_call
+
+def _wrapped_run(*args, **kwargs):
+    if 'cwd' not in kwargs and hasattr(_route_context, 'cwd'): kwargs['cwd'] = _route_context.cwd
+    return _original_run(*args, **kwargs)
+
+def _wrapped_check_output(*args, **kwargs):
+    if 'cwd' not in kwargs and hasattr(_route_context, 'cwd'): kwargs['cwd'] = _route_context.cwd
+    return _original_check_output(*args, **kwargs)
+
+def _wrapped_check_call(*args, **kwargs):
+    if 'cwd' not in kwargs and hasattr(_route_context, 'cwd'): kwargs['cwd'] = _route_context.cwd
+    return _original_check_call(*args, **kwargs)
+
+subprocess.run = _wrapped_run
+subprocess.check_output = _wrapped_check_output
+subprocess.check_call = _wrapped_check_call
+
+def get_cwd():
+    return getattr(_route_context, 'cwd', os.getcwd())
 
 _graph_cache = None
 _graph_cache_time = 0
@@ -119,9 +162,34 @@ def get_knowledge_graph(root_dir):
 
 class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     timeout = 10  # Drop idle speculative connections after 10s
+    
+    def translate_path(self, path):
+        route_name, remaining, physical_dir = get_routing_context(path)
+        path = remaining.split('?',1)[0]
+        path = path.split('#',1)[0]
+        import posixpath
+        path = posixpath.normpath(urllib.parse.unquote(path))
+        words = filter(None, path.split('/'))
+        
+        res = physical_dir
+        for word in words:
+            if os.path.dirname(word) or word in (os.curdir, os.pardir):
+                continue
+            res = os.path.join(res, word)
+        return res
+
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
-        path = parsed_url.path
+        route_name, path, physical_dir = get_routing_context(parsed_url.path)
+        
+        # Bind the thread-safe routing context so all subprocesses and get_cwd() operate transparently within this specific KB.
+        _route_context.cwd = physical_dir
+        
+        if path == '/_api/desktop/ping':
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+            return
         
         if path.startswith('/_api/history'):
             query = urllib.parse.parse_qs(parsed_url.query)
@@ -214,7 +282,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 for entry in entries:
                     if entry.startswith('.') or entry == 'template': continue
                     full_p = os.path.join(dir_path, entry)
-                    rel_p = os.path.relpath(full_p, os.getcwd())
+                    rel_p = os.path.relpath(full_p, physical_dir)
                     if os.path.isdir(full_p):
                         children = build_tree(full_p)
                         tree.append({"type": "folder", "name": entry, "path": rel_p, "children": children})
@@ -222,7 +290,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                          tree.append({"type": "file", "name": entry, "path": rel_p})
                 return tree
                 
-            tree_data = build_tree(os.getcwd())
+            tree_data = build_tree(physical_dir)
             encoded = json.dumps(tree_data).encode('utf-8')
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
@@ -232,8 +300,24 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(encoded)
             return
 
+        if path == '/_api/workspaces':
+            from hi_config import HiConfig
+            kbs = HiConfig.get_workspaces()
+            # Annotate active state
+            for kb in kbs:
+                kb['active'] = (kb['name'] in ROUTE_MAP and ROUTE_MAP[kb['name']] == kb['path'])
+            
+            encoded = json.dumps(kbs).encode('utf-8')
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
+
         if path == '/_api/graph':
-            root_dir = os.getcwd()
+            root_dir = physical_dir
             graph = get_knowledge_graph(root_dir)
             encoded = json.dumps({"nodes": graph["nodes"], "edges": graph["edges"]}).encode('utf-8')
             self.send_response(200)
@@ -249,7 +333,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             file_path = query.get('file', [''])[0]
             file_path = file_path.lstrip('/')
             
-            root_dir = os.getcwd()
+            root_dir = physical_dir
             graph = get_knowledge_graph(root_dir)
             
             links = graph["backlinks"].get(file_path, [])
@@ -265,7 +349,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == '/_api/search':
             query = urllib.parse.parse_qs(parsed_url.query).get('q', [''])[0]
-            search_mgr = SearchManager.get_instance()
+            search_mgr = SearchManager.get_instance(physical_dir)
             results = search_mgr.search(query) if search_mgr else []
             encoded = json.dumps(results).encode('utf-8')
             
@@ -416,11 +500,42 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(encoded)
                 return
+                
+        # Inject HIBOOK_ROOT into HTML requests dynamically mapping the specific multiplexed namespace root
+        if path == '/' or path == '/index.html':
+            local_path = self.translate_path(self.path)
+            if os.path.isdir(local_path):
+                local_path = os.path.join(local_path, 'index.html')
+                
+            if os.path.exists(local_path) and os.path.isfile(local_path):
+                with open(local_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                
+                # If requesting root or Hub index, route_name is empty, HIBOOK_ROOT stays as /
+                root_val = f"/{route_name}/" if route_name else "/"
+                prefix_script = f"<script>window.HIBOOK_ROOT = '{root_val}'; window.HIBOOK_ROOT = window.HIBOOK_ROOT.replace('//', '/');</script>"
+                if '<head>' in html_content:
+                    html_content = html_content.replace('<head>', f'<head>\n  {prefix_script}')
+                else:
+                    html_content = prefix_script + '\n' + html_content
+
+                encoded = html_content.encode('utf-8')
+                self.send_response(200)
+                self.send_header("Content-type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+                return
+
+        # SimpleHTTPRequestHandler will call our overridden translate_path which expects the raw path
+        # to correctly extract the routing context and map to physical_dir.
         super().do_GET()
 
     def do_POST(self):
         parsed_url = urllib.parse.urlparse(self.path)
-        path = parsed_url.path
+        route_name, path, physical_dir = get_routing_context(parsed_url.path)
+        _route_context.cwd = physical_dir
         
         content_length = int(self.headers.get('Content-Length', 0))
         post_data = self.rfile.read(content_length) if content_length > 0 else b'{}'
@@ -437,6 +552,176 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(encoded)))
             self.end_headers()
             self.wfile.write(encoded)
+            
+            
+        def sync_workspace_assets(target_path):
+            tool_dir = os.path.dirname(os.path.abspath(__file__))
+            web_template_dir = os.path.join(tool_dir, 'template', 'web')
+            hibook_web_dir = os.path.join(target_path, '.hibook_web')
+            
+            src_assets = os.path.join(web_template_dir, 'assets')
+            if os.path.exists(src_assets):
+                if not os.path.exists(hibook_web_dir): shutil.copytree(src_assets, hibook_web_dir)
+                else: shutil.copytree(src_assets, hibook_web_dir, dirs_exist_ok=True)
+                    
+            index_path = os.path.join(target_path, 'index.html')
+            if not os.path.exists(index_path):
+                src_index = os.path.join(web_template_dir, 'index.html')
+                if os.path.exists(src_index):
+                    shutil.copy2(src_index, index_path)
+            
+        if path == '/_api/desktop/register':
+            target_name = req.get("name", "")
+            target_path = req.get("path", "")
+            
+            if target_name in ROUTE_MAP and ROUTE_MAP[target_name] != target_path:
+                return send_json({"success": False, "error": f"Namespace '{target_name}' is already currently occupied by {ROUTE_MAP[target_name]}"}, 409)
+                
+            if os.path.exists(target_path):
+                sync_workspace_assets(target_path)
+                ROUTE_MAP[target_name] = target_path
+                from hi_config import HiConfig
+                HiConfig.add_workspace(target_name, target_path)
+                search_mgr = SearchManager.get_instance(target_path)
+                search_mgr.start_background_sync()
+                return send_json({"success": True})
+            return send_json({"success": False, "error": "Path mapping failed"}, 400)
+
+        if path == '/_api/desktop/unregister':
+            target_name = req.get("name", "")
+            if target_name in ROUTE_MAP:
+                del ROUTE_MAP[target_name]
+            return send_json({"success": True})
+            
+        if path == '/_api/desktop/remove_from_hub':
+            target_name = req.get("name", "")
+            if target_name in ROUTE_MAP:
+                del ROUTE_MAP[target_name]
+            from hi_config import HiConfig
+            HiConfig.remove_workspace(target_name)
+            return send_json({"success": True})
+            
+        if path == '/_api/desktop/delete':
+            target_name = req.get("name", "")
+            if target_name in ROUTE_MAP:
+                del ROUTE_MAP[target_name]
+            from hi_config import HiConfig
+            
+            # Find the path before removing it from config
+            kbs = HiConfig.get_workspaces()
+            target_path = next((kb['path'] for kb in kbs if kb['name'] == target_name), None)
+            
+            HiConfig.remove_workspace(target_name)
+            
+            if target_path and os.path.exists(target_path):
+                try:
+                    shutil.rmtree(target_path)
+                except Exception as e:
+                    return send_json({"success": False, "error": f"Failed to delete directory: {str(e)}"}, 500)
+            return send_json({"success": True})
+            
+        if path == '/_api/desktop/launch':
+            target_name = req.get("name", "")
+            from hi_config import HiConfig
+            kbs = HiConfig.get_workspaces()
+            target_path = next((kb['path'] for kb in kbs if kb['name'] == target_name), None)
+            
+            if target_path and os.path.exists(target_path):
+                sync_workspace_assets(target_path)
+                ROUTE_MAP[target_name] = target_path
+                search_mgr = SearchManager.get_instance(target_path)
+                search_mgr.start_background_sync()
+                return send_json({"success": True, "url": f"/{target_name}/"})
+            return send_json({"success": False, "error": "Workspace not found or path invalid"}, 404)
+            
+        if path == '/_api/desktop/pick_folder':
+            try:
+                # Use macOS osascript to open a native folder picker dialogue, securely bringing Finder to the front
+                cmd = ['osascript', '-e', 'tell application "Finder" to activate', '-e', 'tell application "Finder" to return POSIX path of (choose folder)']
+                out = subprocess.check_output(cmd, text=True).strip()
+                if out:
+                    return send_json({"success": True, "path": out})
+                return send_json({"success": False, "error": "No folder selected"})
+            except subprocess.CalledProcessError:
+                return send_json({"success": False, "error": "Folder selection cancelled"})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+            
+        if path == '/_api/desktop/create':
+            name = req.get("name", "").strip()
+            parent_path = req.get("parent_path", "").strip()
+            if not name: return send_json({"success": False, "error": "Invalid name"}, 400)
+            
+            if parent_path:
+                target_path = os.path.join(parent_path, name)
+            else:
+                target_path = os.path.join(os.path.expanduser("~"), "Documents", "Hibook", name)
+                
+            if os.path.exists(target_path): return send_json({"success": False, "error": f"Folder {target_path} already exists"}, 409)
+            
+            os.makedirs(target_path, exist_ok=True)
+            try:
+                subprocess.run(['git', 'init'], cwd=target_path, check=True)
+                with open(os.path.join(target_path, 'README.md'), 'w') as f:
+                    f.write(f"# {name.capitalize()}\n\nWelcome to your new hibook!\n\n> **Note**: This knowledge base strictly follows the [Knowledge Management Rules](./RULE.md).\n")
+                with open(os.path.join(target_path, 'SUMMARY.md'), 'w') as f:
+                    f.write(f"* [{name.capitalize()}](/README.md)\n* [Rules](/RULE.md)\n")
+                with open(os.path.join(target_path, '.gitignore'), 'w') as f:
+                    f.write(".hibook_web/\nhibook_index.db\n.DS_Store\n")
+                
+                src_rule = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template', 'RULE.md')
+                dest_rule = os.path.join(target_path, 'RULE.md')
+                if os.path.exists(src_rule):
+                    shutil.copy2(src_rule, dest_rule)
+                
+                sync_workspace_assets(target_path)
+                
+                subprocess.run(['git', 'add', '.'], cwd=target_path, check=True)
+                subprocess.run(['git', 'commit', '-m', 'Initial commit'], cwd=target_path, check=True)
+                
+                from hi_config import HiConfig
+                HiConfig.add_workspace(name, target_path)
+                return send_json({"success": True, "path": target_path})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
+        if path == '/_api/desktop/clone':
+            url = req.get("url", "").strip()
+            name = req.get("name", "").strip()
+            parent_path = req.get("parent_path", "").strip()
+            if not url: return send_json({"success": False, "error": "Missing URL"}, 400)
+            if not name: name = url.split('/')[-1].replace('.git', '')
+            
+            if parent_path:
+                target_path = os.path.join(parent_path, name)
+            else:
+                target_path = os.path.join(os.path.expanduser("~"), "Documents", "Hibook", name)
+                
+            if os.path.exists(target_path): return send_json({"success": False, "error": f"Folder {target_path} already exists"}, 409)
+            
+            try:
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                subprocess.run(['git', 'clone', url, target_path], check=True)
+                from hi_config import HiConfig
+                HiConfig.add_workspace(name, target_path)
+                return send_json({"success": True, "path": target_path})
+            except Exception as e:
+                return send_json({"success": False, "error": str(e)}, 500)
+                
+        if path == '/_api/desktop/export':
+            name = req.get("name", "")
+            from hi_config import HiConfig
+            kbs = HiConfig.get_workspaces()
+            target_path = next((kb['path'] for kb in kbs if kb['name'] == name), None)
+            
+            if target_path and os.path.exists(target_path):
+                try:
+                    import hi_export
+                    hi_export.cmd_export(target_path)
+                    return send_json({"success": True})
+                except Exception as e:
+                    return send_json({"success": False, "error": str(e)}, 500)
+            return send_json({"success": False, "error": "Workspace not found"}, 404)
 
         if path == '/_api/save':
             file_path = req.get('file', '').lstrip('/')
@@ -444,26 +729,27 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             custom_message = req.get('message', '').strip()
             if not file_path:
                 return send_json({"success": False, "error": "Missing file"}, 400)
+            abs_file_path = os.path.join(physical_dir, file_path)
                 
             try:
-                # Write to disk
-                with open(file_path, 'w', encoding='utf-8') as f:
+                # Write to disk strictly in the sandbox
+                with open(abs_file_path, 'w', encoding='utf-8') as f:
                     f.write(content)
                 # Git commit
-                subprocess.run(['git', 'add', file_path], check=True)
+                subprocess.run(['git', 'add', file_path], cwd=physical_dir, check=True)
                 msg = custom_message if custom_message else f"Manual-save: {file_path}"
-                subprocess.run(['git', 'commit', '-m', msg], capture_output=True)
+                subprocess.run(['git', 'commit', '-m', msg], cwd=physical_dir, capture_output=True)
                 # Get the new hash
-                out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], text=True)
+                out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=physical_dir, text=True)
                 
                 # Update Search Index
-                search_mgr = SearchManager.get_instance()
+                search_mgr = SearchManager.get_instance(physical_dir)
                 if search_mgr:
                     import sqlite3 # Import needed inline
-                    mtime = os.path.getmtime(file_path)
+                    mtime = os.path.getmtime(abs_file_path)
                     with search_mgr.lock:
                         with sqlite3.connect(search_mgr.db_path) as conn:
-                            search_mgr._update_file_index(conn, file_path, os.path.join(search_mgr.root_dir, file_path), mtime)
+                            search_mgr._update_file_index(conn, file_path, abs_file_path, mtime)
                             conn.commit()
                             
                 return send_json({"success": True, "hash": out.strip()})
@@ -474,39 +760,39 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             custom_msg = req.get('message', 'Save external changes').strip()
             if not custom_msg: custom_msg = 'Save external changes'
             try:
-                subprocess.run(['git', 'add', '.'], check=True)
-                subprocess.run(['git', 'commit', '-m', custom_msg], capture_output=True)
-                out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], text=True)
+                subprocess.run(['git', 'add', '.'], cwd=physical_dir, check=True)
+                subprocess.run(['git', 'commit', '-m', custom_msg], cwd=physical_dir, capture_output=True)
+                out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=physical_dir, text=True)
                 return send_json({"success": True, "hash": out.strip()})
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
                 
         if path == '/_api/discard_all':
             try:
-                subprocess.run(['git', 'reset', '--hard'], check=True, capture_output=True)
-                subprocess.run(['git', 'clean', '-fd'], check=True, capture_output=True)
+                subprocess.run(['git', 'reset', '--hard'], cwd=physical_dir, check=True, capture_output=True)
+                subprocess.run(['git', 'clean', '-fd'], cwd=physical_dir, check=True, capture_output=True)
                 return send_json({"success": True})
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
                 
         if path == '/_api/sync':
             # Check for remote first
-            remote_check = subprocess.run(['git', 'remote', '-v'], capture_output=True, text=True)
+            remote_check = subprocess.run(['git', 'remote', '-v'], cwd=physical_dir, capture_output=True, text=True)
             if not remote_check.stdout.strip():
                 return send_json({"success": False, "no_remote": True, "error": "No remote configured"})
                 
             # Perform pull --no-rebase
-            pull_res = subprocess.run(['git', 'pull', '--no-rebase'], capture_output=True, text=True)
+            pull_res = subprocess.run(['git', 'pull', '--no-rebase'], cwd=physical_dir, capture_output=True, text=True)
             if pull_res.returncode != 0:
                 # If conflict, abort and return conflict state
                 if 'conflict' in pull_res.stdout.lower() or 'conflict' in pull_res.stderr.lower() or 'Automatic merge failed' in pull_res.stdout:
-                    subprocess.run(['git', 'merge', '--abort'])
+                    subprocess.run(['git', 'merge', '--abort'], cwd=physical_dir)
                     return send_json({"success": False, "conflict": True, "details": pull_res.stdout + pull_res.stderr})
                 # Other error (e.g. no upstream, or uncommitted changes)
                 return send_json({"success": False, "conflict": False, "error": pull_res.stderr or pull_res.stdout})
                 
             # Pull succeeded (or already up to date), now push
-            push_res = subprocess.run(['git', 'push'], capture_output=True, text=True)
+            push_res = subprocess.run(['git', 'push'], cwd=physical_dir, capture_output=True, text=True)
             if push_res.returncode != 0:
                 return send_json({"success": False, "error": "Failed to push: " + push_res.stderr})
                 
@@ -518,15 +804,15 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return send_json({"success": False, "error": "Missing remote URL"}, 400)
             try:
                 try:
-                    subprocess.run(['git', 'remote', 'add', 'origin', remote_url], check=True, capture_output=True, text=True)
+                    subprocess.run(['git', 'remote', 'add', 'origin', remote_url], cwd=physical_dir, check=True, capture_output=True, text=True)
                 except subprocess.CalledProcessError:
-                    subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], check=True, capture_output=True, text=True)
+                    subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], cwd=physical_dir, check=True, capture_output=True, text=True)
                 
-                curr_branch = subprocess.check_output(['git', 'branch', '--show-current'], text=True).strip()
+                curr_branch = subprocess.check_output(['git', 'branch', '--show-current'], cwd=physical_dir, text=True).strip()
                 if not curr_branch: curr_branch = 'main'
                 
                 # Setup upstream and push
-                push_res = subprocess.run(['git', 'push', '-u', 'origin', curr_branch], capture_output=True, text=True)
+                push_res = subprocess.run(['git', 'push', '-u', 'origin', curr_branch], cwd=physical_dir, capture_output=True, text=True)
                 if push_res.returncode != 0:
                     return send_json({"success": False, "error": f"Failed to push to new remote: {push_res.stderr}"})
                 return send_json({"success": True})
@@ -541,10 +827,10 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             strat_flag = '-Xours' if strategy == 'local' else '-Xtheirs'
             try:
                 # Attempt to pull and auto-resolve using the strategy
-                res = subprocess.run(['git', 'pull', '--no-rebase', '-s', 'recursive', strat_flag], capture_output=True, text=True)
+                res = subprocess.run(['git', 'pull', '--no-rebase', '-s', 'recursive', strat_flag], cwd=physical_dir, capture_output=True, text=True)
                 if res.returncode != 0:
                      return send_json({"success": False, "error": "Resolution failed: " + res.stderr})
-                subprocess.run(['git', 'push'], check=True)
+                subprocess.run(['git', 'push'], cwd=physical_dir, check=True)
                 return send_json({"success": True})
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
@@ -554,9 +840,9 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not commit_hash:
                 return send_json({"success": False, "error": "Missing commit hash"}, 400)
             try:
-                res = subprocess.run(['git', 'rebase', '--onto', commit_hash + '^', commit_hash], capture_output=True, text=True)
+                res = subprocess.run(['git', 'rebase', '--onto', commit_hash + '^', commit_hash], cwd=physical_dir, capture_output=True, text=True)
                 if res.returncode != 0:
-                    subprocess.run(['git', 'rebase', '--abort'], capture_output=True)
+                    subprocess.run(['git', 'rebase', '--abort'], cwd=physical_dir, capture_output=True)
                     return send_json({"success": False, "error": "无法彻底抹除该记录由于存在冲突。请手动解决或使用回滚操作。\n详情: " + res.stderr + res.stdout})
                 return send_json({"success": True})
             except Exception as e:
@@ -591,7 +877,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                             commit_msg = f"Create {target_path} and update SUMMARY.md"
                             
                         subprocess.run(['git', 'commit', '-m', commit_msg])
-                        search_mgr = SearchManager.get_instance()
+                        search_mgr = SearchManager.get_instance(physical_dir)
                         if search_mgr: search_mgr.sync_index()
                 return send_json({"success": True})
             except Exception as e:
@@ -632,7 +918,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as e:
                     print(f"Warning: Auto-update SUMMARY failed: {e}")
                     
-                search_mgr = SearchManager.get_instance()
+                search_mgr = SearchManager.get_instance(physical_dir)
                 if search_mgr: search_mgr.sync_index()
                 return send_json({"success": True})
             except Exception as e:
@@ -676,7 +962,7 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                                     modified_files.append(rel_p)
                 
                 subprocess.run(['git', 'commit', '-m', f"Rename {old_path} to {new_path} and update {len(modified_files)} links"])
-                search_mgr = SearchManager.get_instance()
+                search_mgr = SearchManager.get_instance(physical_dir)
                 if search_mgr: search_mgr.sync_index()
                 return send_json({"success": True, "updated_links": len(modified_files)})
             except Exception as e:
@@ -685,49 +971,94 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404, "API not found")
 
 
-def cmd_web(args):
+def cmd_start(args):
     port = args.get("port")
-    if not port:
-        port = 3000
-    elif type(port) == list and len(port) > 0:
-        port = int(port[0])
-    else:
-        port = int(port)
-    
-    tool_dir = os.path.dirname(os.path.abspath(__file__))
-    web_template_dir = os.path.join(tool_dir, 'template', 'web')
-    root_dir = os.getcwd()
-    hibook_web_dir = os.path.join(root_dir, '.hibook_web')
-    
-    # copy assets
-    src_assets = os.path.join(web_template_dir, 'assets')
-    if os.path.exists(src_assets):
-        if not os.path.exists(hibook_web_dir):
-            shutil.copytree(src_assets, hibook_web_dir)
-        else:
-            shutil.copytree(src_assets, hibook_web_dir, dirs_exist_ok=True)
-            
-    # inject index.html if not present
-    index_path = os.path.join(root_dir, 'index.html')
-    if not os.path.exists(index_path):
-        src_index = os.path.join(web_template_dir, 'index.html')
-        if os.path.exists(src_index):
-            shutil.copy2(src_index, index_path)
-            HiLog.info("Injected Docsify index.html into current directory.")
-
-    HiLog.info("Starting web server at http://localhost:{port}")
+    port = int(port) if port else 3000
+    HiLog.info(f"Starting Hibook Global Multiplexing Hub on port {port}...")
+    HiLog.info(f"Hub Dashboard available at http://localhost:{port}/")
     HiLog.info("Press Ctrl+C to stop.")
-    
-    # Initialize background indexing module
-    search_mgr = SearchManager.get_instance(root_dir)
-    search_mgr.start_background_sync()
     
     class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
         daemon_threads = True
         allow_reuse_address = True
 
-    with ThreadedTCPServer(("", port), HibookHTTPRequestHandler) as httpd:
-        try:
+    try:
+        with ThreadedTCPServer(("", port), HibookHTTPRequestHandler) as httpd:
             httpd.serve_forever()
-        except KeyboardInterrupt:
-            pass
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        HiLog.error(f"Failed to start Hub server on port {port}. {e}")
+
+def cmd_stop(args):
+    name = args.get("name")
+    import urllib.request
+    from hi_config import HiConfig
+    port = HiConfig.get_config().get("port", 3000)
+    
+    if name:
+        # Unregister specific namespace
+        req = urllib.request.Request(f"http://localhost:{port}/_api/desktop/unregister",
+                                     data=json.dumps({"name": name}).encode('utf-8'),
+                                     headers={'Content-Type': 'application/json'},
+                                     method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=3) as response:
+                HiLog.info(f"Successfully unmounted workspace '{name}' from the daemon.")
+        except Exception as e:
+            HiLog.error(f"Failed to unmount workspace '{name}'. The daemon might be offline. {e}")
+    else:
+        # Stop global Hub daemon? Since it's a daemon, simplest is to just tell users to pkill it 
+        # or implement a shutdown endpoint. Let's just pkill it for now to be robust.
+        subprocess.run(['pkill', '-f', f'hibook start -p {port}'])
+        subprocess.run(['pkill', '-f', f'hibook start'])
+        HiLog.info(f"Hibook Hub daemon stopped.")
+
+def cmd_web(args):
+    port = args.get("port")
+    name = args.get("name")
+    if type(port) == list and len(port) > 0: port = port[0]
+    if type(name) == list and len(name) > 0: name = name[0]
+    port = int(port) if port else 3000
+    root_dir = os.getcwd()
+    
+    if not name:
+        name = os.path.basename(root_dir)
+    
+    import urllib.request
+    import urllib.error
+    import webbrowser
+    
+    # Detect if daemon is already active on this port
+    is_daemon_alive = False
+    try:
+        req = urllib.request.Request(f"http://localhost:{port}/_api/desktop/ping", method="GET")
+        with urllib.request.urlopen(req, timeout=1) as response:
+            if response.status == 200:
+                is_daemon_alive = True
+    except:
+        pass
+        
+    if not is_daemon_alive:
+        HiLog.info(f"Hub is offline. Automatically spawning Master Daemon in background on port {port}...")
+        subprocess.Popen(['hibook', 'start', '-p', str(port)], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _time.sleep(1.5) # Allow bind time
+
+    # Register
+    req = urllib.request.Request(f"http://localhost:{port}/_api/desktop/register", 
+                                 data=json.dumps({"name": name, "path": root_dir}).encode('utf-8'),
+                                 headers={'Content-Type': 'application/json'},
+                                 method="POST")
+    try:
+        with urllib.request.urlopen(req) as response:
+            target_url = f"http://localhost:{port}/{name}/"
+            HiLog.info(f"Successfully mounted at {target_url}")
+            webbrowser.open(target_url)
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            HiLog.error(f"Name conflict! Workspace name '{name}' is already attached to a different repository.")
+            HiLog.error(f"Please use 'hibook web -n <unique-name>' instead.")
+        else:
+            HiLog.error(f"Failed to register route to daemon: HTTP {e.code}")
+    except Exception as e:
+        HiLog.error(f"Failed to register route to daemon: {e}")

@@ -116,7 +116,7 @@
     }
 
     function performSearch(query) {
-        fetch(`/_api/search?q=${encodeURIComponent(query)}`)
+        fetch((window.HIBOOK_ROOT || '/') + `_api/search?q=${encodeURIComponent(query)}`)
             .then(res => res.json())
             .then(data => {
                 renderResults(data);

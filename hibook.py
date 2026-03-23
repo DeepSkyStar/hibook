@@ -6,7 +6,7 @@ import os
 import argparse
 import textwrap
 import shutil
-from hi_server import cmd_web
+from hi_server import cmd_web, cmd_start, cmd_stop
 from hi_export import cmd_update, cmd_export
 
 def __info(args):
@@ -107,7 +107,29 @@ def __setup_parser():
         nargs=1,
         action="store"
     )
+    parser_web.add_argument(
+        "-n", "--name",
+        help="Namespace identifier to mount on the multiplexing daemon",
+        nargs=1,
+        action="store"
+    )
     parser_web.set_defaults(func=cmd_web)
+
+    # start
+    parser_start = subparsers.add_parser(
+        name="start",
+        help="Start the global Hibook Dashboard Hub."
+    )
+    parser_start.add_argument('-p', '--port', type=int, default=3000, help='Port to run the hub on (default 3000)')
+    parser_start.set_defaults(func=cmd_start)
+
+    # stop
+    parser_stop = subparsers.add_parser(
+        name="stop",
+        help="Stop the global Hibook Dashboard Hub or unregister a knowledge base."
+    )
+    parser_stop.add_argument('name', nargs='?', default='', help='Name of the workspace to stop (omitting this kills the entire hub)')
+    parser_stop.set_defaults(func=cmd_stop)
 
     parser_update = subparsers.add_parser(
         name="update",

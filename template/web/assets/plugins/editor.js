@@ -74,7 +74,7 @@
   function saveContent(content, filepath, commitMessage = "") {
      if (!filepath) return;
      document.getElementById('hibook-editor-title').innerHTML = `Saving ${filepath}...`;
-     fetch('/_api/save', {
+     fetch((window.HIBOOK_ROOT || '/') + '_api/save', {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({ file: filepath, content: content, message: commitMessage })
@@ -110,7 +110,7 @@
         document.getElementById('hibook-editor-title').innerHTML = `Editing: ${filepath}`;
         
         // Fetch raw markdown
-        fetch('/' + encodeURI(filepath))
+        fetch((window.HIBOOK_ROOT || '/') + encodeURI(filepath))
             .then(res => res.text())
             .then(text => {
                 if (!easyMdeInstance) {
@@ -149,7 +149,7 @@
           btn.title = originalTitle;
       };
       
-      fetch('/_api/sync', { method: 'POST' })
+      fetch((window.HIBOOK_ROOT || '/') + '_api/sync', { method: 'POST' })
         .then(res => res.json())
         .then(res => {
             if (res.success) {
@@ -158,7 +158,7 @@
             } else if (res.no_remote) {
                 let remoteUrl = prompt("未检测到远程仓库配置。\n请输入完整的 Git 远程仓库地址 (例如 git@github.com:user/repo.git)\n若配置成功将自动重试合并与推送：");
                 if (remoteUrl && remoteUrl.trim()) {
-                    fetch('/_api/set_remote', {
+                    fetch((window.HIBOOK_ROOT || '/') + '_api/set_remote', {
                         method: 'POST',
                         body: JSON.stringify({ remote: remoteUrl.trim() }),
                         headers: { 'Content-Type': 'application/json' }
@@ -194,7 +194,7 @@
       const btn = document.getElementById('btn-sync');
       btn.innerHTML = '<span style="font-size: 1.2em;">⏳</span>';
       btn.title = 'Resolving...';
-      fetch('/_api/resolve', {
+      fetch((window.HIBOOK_ROOT || '/') + '_api/resolve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ strategy: strategy })
@@ -213,7 +213,7 @@
   }
   
   function checkStatus() {
-      fetch('/_api/status')
+      fetch((window.HIBOOK_ROOT || '/') + '_api/status')
         .then(res => res.json())
         .then(res => {
             const btn = document.getElementById('btn-sync');
