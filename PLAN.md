@@ -52,8 +52,11 @@
 * **侧边栏资源管理器重构**: 引入动态文件树面板，支持前端右键新建、拖拽改变文件目录结构，并由系统自动修正受影响的相对链接。
 * **极速桌面级检索**: 引入 Whoosh 等轻量级 Python 本地倒排索引库。在 Web 端实现类似 `Ctrl+p` 的 Command Palette，支持通过文件名、标签和全文的秒级复合检索。
 
-## Phase 4: 降维打击 —— 桌面级原生应用化 (Desktop App)
-*完成从 “CLI 工具 + 浏览器” 到 “Native App” 的终极蜕变。*
+## Phase 4: 降维打击 —— 全局多路复用中枢 (Global Multiplexing Hub)
+*完成从 “单库静态服务器” 到 “多并发动态门户” 的终极蜕变。*
 
-* **轻量级壳体打包**: 采用 Tauri 或是 PyWebView。把成熟的 Python 服务器和进化的极客前端包裹进一个独立的窗口 App 里。
-* **系统级整合**: 使得软件可以直接监听系统全局快捷键、读取本地剪贴板图片直接粘贴保存到 `assets` 目录，并获得彻底离线的桌面端沉浸体验。
+> **⚠️ 进化分歧 (Evolution Pivot)**: 原计划采用 Tauri 或 PyWebView 强行将 Python 后端包裹进 Native App 里。但实践证明，GUI 原生的 `confirm/alert` 弹窗会灾难性地冻结 Python Daemon 主事件循环（详见 `DEV_GUIDE.md`）。因此全面转向基于纯 `hi_server` 挂载原生虚拟路径映射的 **Web Hub Dashboard**。
+
+* **Daemon 守护进程化**: 抛弃单个知识库独占进程的设计。系统支持 `hibook start -p 3000` 启动全局唯一中枢后台。
+* **聚合调度面板**: `http://localhost:3000/` 原生托管一份美观的纯前端控制台（Hub Dashboard），使得软件可以在单个端口内轻松支持工作区的动态创建（Scaffold）、挂载与安全销毁。
+* **原生 UI 重建**: 所有弹窗、通知均使用纯 HTML/CSS 脱离操作系统 Native 线程注入，彻底斩断 GUI 阻塞死锁。
