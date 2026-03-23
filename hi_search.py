@@ -5,16 +5,18 @@ import threading
 from hi_basic import HiLog
 
 class SearchManager:
-    _instance = None
+    _instances = {}
     _lock = threading.Lock()
 
     @classmethod
     def get_instance(cls, root_dir=None):
-        if not cls._instance and root_dir:
-            with cls._lock:
-                if not cls._instance:
-                    cls._instance = SearchManager(root_dir)
-        return cls._instance
+        if not root_dir:
+            return None
+            
+        with cls._lock:
+            if root_dir not in cls._instances:
+                cls._instances[root_dir] = SearchManager(root_dir)
+            return cls._instances[root_dir]
 
     def __init__(self, root_dir):
         self.root_dir = root_dir
