@@ -214,19 +214,7 @@ def cmd_export(target_dir=None, output_dir=None):
         f.write(full_content)
     HiLog.info(f"Markdown export saved to: {output_md_path}")
 
-    # Copy template resources
-    tool_dir = os.path.dirname(os.path.abspath(__file__))
-    web_rule_dir = os.path.join(tool_dir, 'template', 'web')
-    
-    src_entry = os.path.join(web_rule_dir, 'assets', 'mermaid.esm.min.mjs')
-    dst_entry = os.path.join(output_dir, 'mermaid.js')
-    if os.path.exists(src_entry):
-        shutil.copy2(src_entry, dst_entry)
-    
-    src_chunk = os.path.join(web_rule_dir, 'assets', 'mermaid-b92f6f74.js')
-    dst_chunk = os.path.join(output_dir, 'mermaid-b92f6f74.js')
-    if os.path.exists(src_chunk):
-        shutil.copy2(src_chunk, dst_chunk)
+    # No longer copying separate mermaid ESM packages since we migrated to single global CDN bundles
 
     try:
         math_placeholders = {}
@@ -312,12 +300,17 @@ def cmd_export(target_dir=None, output_dir=None):
 MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }}, svg: {{ fontCache: 'global' }} }};
 </script>
 <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
-<script type="module">
-    import mermaid from "./mermaid.js";
+<script src="https://cdn.jsdelivr.net/npm/mermaid@9.4.3/dist/mermaid.min.js"></script>
+<script type="text/javascript">
     mermaid.initialize({{
         startOnLoad: false, theme: 'neutral', securityLevel: 'loose', flowchart: {{ useMaxWidth: true, htmlLabels: true, curve: 'basis' }}
     }});
-    await mermaid.run({{ querySelector: '.mermaid' }});
+    window.addEventListener('load', function() {{
+        var nodes = document.querySelectorAll('.mermaid');
+        if (nodes.length > 0) {{
+            mermaid.init(undefined, nodes);
+        }}
+    }});
 </script>
 </head>
 <body>
