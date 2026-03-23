@@ -242,15 +242,62 @@ async function submitExport() {
     }
 }
 
+let currentDirPickerInputId = null;
+let currentDirPickerPath = "";
+
 async function pickFolder(targetId) {
+    currentDirPickerInputId = targetId;
+    document.getElementById('dir-picker-modal').style.display = 'flex';
+    document.getElementById('dir-picker-list').innerHTML = '<div style="padding:20px;text-align:center;color:#888;">Loading...</div>';
+    
+    // Start at current value or home
+    let startPath = document.getElementById(targetId).value.trim();
+    await loadDir(startPath || '~');
+}
+
+function closeDirPicker() {
+    document.getElementById('dir-picker-modal').style.display = 'none';
+    currentDirPickerInputId = null;
+}
+
+async function loadDir(path) {
     try {
-        const res = await fetchJSON('/_api/desktop/pick_folder', { method: 'POST', body: JSON.stringify({}) });
-        if (res.success && res.path) {
-            document.getElementById(targetId).value = res.path;
+        const res = await fetchJSON('/_api/desktop/list_dirs', { method: 'POST', body: JSON.stringify({path: path}) });
+        if (res.success) {
+            currentDirPickerPath = res.current_path;
+            document.getElementById('dir-picker-path').innerText = res.current_path;
+            
+            let html = '';
+            if (res.parent_path) {
+                html += `<div class="dir-item" onclick="loadDir('${res.parent_path.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}')">
+                    <span class="dir-item-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></span> ... (Go Up)
+                </div>`;
+            }
+            
+            for (const d of res.dirs) {
+                html += `<div class="dir-item" onclick="loadDir('${d.path.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}')">
+                    <span class="dir-item-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2-2H5a2 2 0 0 0-2 2z"></path></svg></span> ${d.name}
+                </div>`;
+            }
+            
+            if (res.dirs.length === 0) {
+                html += '<div style="padding:20px;text-align:center;color:#888;">Empty directory</div>';
+            }
+            
+            document.getElementById('dir-picker-list').innerHTML = html;
+        } else {
+            alert("Failed to list directory: " + res.error);
         }
     } catch (err) {
-        console.log("Folder selection cancelled or failed:", err);
+        console.error("Dir load error:", err);
     }
+}
+
+function confirmDirSelection() {
+    if (currentDirPickerInputId && currentDirPickerPath) {
+        document.getElementById(currentDirPickerInputId).value = currentDirPickerPath;
+    }
+    closeDirPicker();
 }
 
 async function submitCreate() {

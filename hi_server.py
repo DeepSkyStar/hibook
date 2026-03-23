@@ -644,16 +644,49 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return send_json({"success": True, "url": f"/{target_name}/"})
             return send_json({"success": False, "error": "Workspace not found or path invalid"}, 404)
             
-        if path == '/_api/desktop/pick_folder':
+        if path == '/_api/desktop/list_dirs':
             try:
-                # Use macOS osascript to open a native folder picker dialogue, securely bringing Finder to the front
-                cmd = ['osascript', '-e', 'tell application "Finder" to activate', '-e', 'tell application "Finder" to return POSIX path of (choose folder)']
-                out = subprocess.check_output(cmd, text=True).strip()
-                if out:
-                    return send_json({"success": True, "path": out})
-                return send_json({"success": False, "error": "No folder selected"})
-            except subprocess.CalledProcessError:
-                return send_json({"success": False, "error": "Folder selection cancelled"})
+                # Payload is already natively unpacked upstream into "req" dict
+                req_path = req.get("path", "~")
+                home_dir = os.path.abspath(os.path.expanduser("~"))
+                
+                if not req_path or req_path == "~":
+                    req_path = home_dir
+                req_path = os.path.abspath(req_path)
+                
+                if not req_path.startswith(home_dir):
+                    req_path = home_dir
+                
+                if not os.path.isdir(req_path):
+                    req_path = os.path.dirname(req_path)
+                    if not os.path.isdir(req_path) or not req_path.startswith(home_dir):
+                        req_path = home_dir
+                
+                dirs = []
+                try:
+                    for entry in sorted(os.listdir(req_path)):
+                        if entry.startswith('.'): continue
+                        
+                        full_entry = os.path.join(req_path, entry)
+                        if os.path.isdir(full_entry):
+                            if os.access(full_entry, os.R_OK | os.X_OK):
+                                dirs.append({
+                                    "name": entry,
+                                    "path": full_entry
+                                })
+                except PermissionError:
+                    pass 
+                    
+                parent_path = os.path.dirname(req_path)
+                if parent_path == req_path or not parent_path.startswith(home_dir): 
+                    parent_path = None
+                
+                return send_json({
+                    "success": True, 
+                    "current_path": req_path,
+                    "parent_path": parent_path,
+                    "dirs": dirs
+                })
             except Exception as e:
                 return send_json({"success": False, "error": str(e)}, 500)
             

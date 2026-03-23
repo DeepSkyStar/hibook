@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hibook Hub</title>
-    <link rel="stylesheet" href="dashboard.css?v=7">
+    <link rel="stylesheet" href="dashboard.css?v=8">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -185,6 +185,25 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=5"></script>
+    <div class="modal-overlay" id="dir-picker-modal">
+        <div class="modal-card scale-in" style="max-width: 500px; width: 90%;">
+            <div class="modal-header">
+                <h3>Select Directory</h3>
+                <button class="icon-btn" onclick="closeDirPicker()"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+            <div class="modal-body" style="padding-top: 5px;">
+                <div class="dir-path-display" id="dir-picker-path" style="font-family: monospace; font-size: 13px; background: #f3f4f6; padding: 8px; border-radius: 6px; margin-bottom: 12px; word-break: break-all; color: #374151;">/</div>
+                <div class="dir-list-container" id="dir-picker-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 15px;">
+                    <!-- Directory items will be injected here -->
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="closeDirPicker()">Cancel</button>
+                    <button class="btn btn-primary" onclick="confirmDirSelection()">Select Here</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="dashboard.js?v=6"></script>
 </body>
 </html>
