@@ -553,6 +553,11 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(encoded)
             
+        def is_safe_path(base, target):
+            import os
+            base_abs = os.path.abspath(base)
+            target_abs = os.path.abspath(os.path.join(base, target))
+            return target_abs.startswith(base_abs)
             
         def sync_workspace_assets(target_path):
             tool_dir = os.path.dirname(os.path.abspath(__file__))
@@ -725,6 +730,8 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == '/_api/save':
             file_path = req.get('file', '').lstrip('/')
+            if not is_safe_path(physical_dir, file_path):
+                return send_json({"success": False, "error": "Security: Invalid remote path traversal detected"}, 403)
             content = req.get('content', '')
             custom_message = req.get('message', '').strip()
             if not file_path:
@@ -850,6 +857,8 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         
         if path == '/_api/fs/create':
             target_path = req.get('path', '').lstrip('/')
+            if not is_safe_path(physical_dir, target_path):
+                return send_json({"success": False, "error": "Security: Invalid path traversal detected"}, 403)
             is_dir = req.get('is_dir', False)
             append_to_summary = req.get('append_summary', False)
             title = req.get('title', '')
@@ -901,6 +910,8 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == '/_api/fs/delete':
             target_path = req.get('path', '').lstrip('/')
+            if not is_safe_path(physical_dir, target_path):
+                return send_json({"success": False, "error": "Security: Invalid path traversal detected"}, 403)
             if not target_path or not os.path.exists(target_path):
                 return send_json({"success": False, "error": "Path not found"}, 400)
             if _is_sync_required():
@@ -927,6 +938,8 @@ class HibookHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path == '/_api/fs/rename':
             old_path = req.get('old_path', '').lstrip('/')
             new_path = req.get('new_path', '').lstrip('/')
+            if not is_safe_path(physical_dir, old_path) or not is_safe_path(physical_dir, new_path):
+                return send_json({"success": False, "error": "Security: Invalid path traversal detected"}, 403)
             if not old_path or not new_path or not os.path.exists(old_path):
                 return send_json({"success": False, "error": "Invalid paths"}, 400)
             if _is_sync_required():

@@ -60,3 +60,10 @@
 * **Daemon 守护进程化**: 抛弃单个知识库独占进程的设计。系统支持 `hibook start -p 3000` 启动全局唯一中枢后台。
 * **聚合调度面板**: `http://localhost:3000/` 原生托管一份美观的纯前端控制台（Hub Dashboard），使得软件可以在单个端口内轻松支持工作区的动态创建（Scaffold）、挂载与安全销毁。
 * **原生 UI 重建**: 所有弹窗、通知均使用纯 HTML/CSS 脱离操作系统 Native 线程注入，彻底斩断 GUI 阻塞死锁。
+
+## Phase 5: Frontend Spaghetti Eradication (Zero-Dependency Modularization)
+*在坚持“零外部构建工具”（不引入 NPM / Vite）的前提下，实现前端视图层代码的现代化重构。*
+
+- **Status:** **Planning**
+- **Goal:** Tame the growing complexity of frontend DOM manipulation (`dashboard.js`, `hi_mermaid.js`, etc) without introducing external build step dependencies.
+- **Strategy:** Migrating from pure global script-tag monolithic code to **Native Browser ES Modules (`<script type="module">`)**. Isolating UI features strictly using raw **Web Components (`customElements.define`)** accompanied by Shadow DOM for style/event encapsulation. This guarantees our zero-dependency geek philosophy while curing the spaghetti lifecycle nightmare natively within the browser.
