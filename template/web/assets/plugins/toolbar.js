@@ -73,7 +73,7 @@
         btn.className = 'tool-btn';
         btn.id = b.id; // preserve inner ID for potential testing
         btn.title = b.text;
-        btn.innerHTML = `<span style="font-size: 1.2em;">${b.icon}</span>`;
+        btn.innerHTML = b.icon;
         btn.onclick = b.onClick;
         container.appendChild(btn);
       });
@@ -105,6 +105,7 @@
             color: #888;
             font-size: 12px;
             transition: transform 0.3s, background-color 0.2s;
+            line-height: 0;
           }
           .toggle-btn:hover {
             background-color: rgba(0,0,0,0.05);
@@ -127,10 +128,15 @@
             align-items: center;
             border-radius: 50%;
             cursor: pointer;
-            transition: background-color 0.2s, transform 0.2s;
+            transition: background-color 0.2s, transform 0.2s, color 0.2s;
+            color: #94a3b8; /* Light gray minimalist default */
+            line-height: 0;
+            box-sizing: border-box;
           }
+          .tool-btn svg { display: block; }
           .tool-btn:hover {
-            background-color: rgba(66, 185, 131, 0.15);
+            background-color: #f1f5f9;
+            color: #3b82f6; /* Highlight blue on hover */
             transform: scale(1.1);
           }
         </style>
@@ -151,5 +157,10 @@
       const tb = document.createElement('hi-toolbar');
       document.body.appendChild(tb);
   }
+
+  // Register Global Home Button
+  window.addToolbarButton('nav-hub', '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>', 'Return to Hub', () => {
+      window.location.href = '/';
+  }, 60);
 
 })();

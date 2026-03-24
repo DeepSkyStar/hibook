@@ -83,8 +83,8 @@
 
     setupDocsifyIntegration() {
       if (window.addToolbarButton) {
-        window.addToolbarButton('btn-edit', '✏️', 'Edit', this.toggleEditMode, 20);
-        window.addToolbarButton('btn-sync', '🔄', 'Sync', this.syncRepository, 30);
+        window.addToolbarButton('btn-edit', '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>', 'Edit', this.toggleEditMode, 20);
+        window.addToolbarButton('btn-sync', '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>', 'Sync', this.syncRepository, 30);
       }
       
       this.checkStatus();
@@ -262,12 +262,32 @@
           }
           if (!btn) return;
           
-          if (res.dirty || res.ahead > 0) {
-            btn.style.boxShadow = '0 0 10px rgba(255,165,0,0.8)';
+          btn.style.boxShadow = 'none';
+          let badge = btn.querySelector('.sync-badge');
+          if (badge) badge.remove();
+          
+          if (res.dirty || res.ahead > 0 || res.behind > 0) {
+            btn.style.position = 'relative';
+            const dot = document.createElement('div');
+            dot.className = 'sync-badge';
+            dot.style.position = 'absolute';
+            dot.style.top = '4px';
+            dot.style.right = '4px';
+            dot.style.width = '6px';
+            dot.style.height = '6px';
+            dot.style.backgroundColor = '#e74c3c';
+            dot.style.borderRadius = '50%';
+            dot.style.border = '2px solid var(--theme-bg, #fff)';
+            dot.style.pointerEvents = 'none';
+            btn.appendChild(dot);
           }
+          
           if (res.behind > 0) {
-            btn.innerHTML = `<span style="font-size: 1.2em;">⬇️</span>`;
             btn.title = `Pull (${res.behind} behind)`;
+          } else if (res.ahead > 0 || res.dirty) {
+            btn.title = 'Push required (Unsynced changes)';
+          } else {
+            btn.title = 'Sync (Up to date)';
           }
         });
     }

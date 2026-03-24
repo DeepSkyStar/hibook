@@ -164,9 +164,9 @@
         const inactiveColor = 'var(--theme-color-text, #333)';
         
         const tabTOC = document.createElement('div');
-        tabTOC.innerText = '📖 目 录';
+        tabTOC.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> 目 录';
         const tabExplorer = document.createElement('div');
-        tabExplorer.innerText = '📁 文 件';
+        tabExplorer.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> 文 件';
         
         [tabTOC, tabExplorer].forEach(tab => {
             tab.style.flex = '1';
@@ -197,9 +197,9 @@
         tocControls.style.gap = '8px';
         
         const btnEdit = document.createElement('button');
-        btnEdit.innerHTML = '✏️ 编辑目录';
+        btnEdit.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> 编辑目录';
         const btnNew = document.createElement('button');
-        btnNew.innerHTML = '🆕 新建文章';
+        btnNew.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg> 新建文章';
         
         [btnEdit, btnNew].forEach(btn => {
              btn.style.flex = '1';
@@ -239,7 +239,7 @@
              box.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
              
              const title = document.createElement('h3');
-             title.innerText = '🆕 新建挂载文章';
+             title.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg> 新建挂载文章';
              title.style.marginTop = '0';
              
              const lblName = document.createElement('label');

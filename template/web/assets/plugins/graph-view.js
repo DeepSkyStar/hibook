@@ -92,7 +92,7 @@
 
     setupDocsifyIntegration() {
       if (window.addToolbarButton) {
-        window.addToolbarButton('btn-graph-view', '🕸️', 'Graph', this.openGraphModal, 50);
+        window.addToolbarButton('btn-graph-view', '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="5" cy="5" r="2"></circle><circle cx="19" cy="19" r="2"></circle><circle cx="5" cy="19" r="2"></circle><path d="M13.5 10.5l4-4"></path><path d="M10.5 10.5l-4-4"></path><path d="M13.5 13.5l4 4"></path><path d="M10.5 13.5l-4 4"></path></svg>', 'Graph', this.openGraphModal, 50);
       } else {
         // Fallback if toolbar.js is missing
         const btnContainer = this.shadowRoot.getElementById('fallback-btn-container');

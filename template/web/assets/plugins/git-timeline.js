@@ -17,7 +17,7 @@
     connectedCallback() {
       this.render();
       if (window.addToolbarButton) {
-        window.addToolbarButton('btn-git-timeline', '⏱️', 'History', this.openTimelineDrawer, 40);
+        window.addToolbarButton('btn-git-timeline', '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>', 'History', this.openTimelineDrawer, 40);
       }
       
       // Expose globally for things like explorer.js and sidebar-tabs.js
@@ -139,7 +139,7 @@
 
         <div id="git-timeline-drawer">
           <div id="drawer-close">✕</div>
-          <h3 id="drawer-title">⏱️ 变更时间线</h3>
+          <h3 id="drawer-title" style="display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" class="hi-icon" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 变更时间线</h3>
           <div id="git-timeline-content"><span style="color:#999">请打开或刷新页面加载历史...</span></div>
         </div>
 
@@ -203,7 +203,7 @@
            
            content.innerHTML = 
               '<div style="background:#fffae6; color:#856404; padding:10px; margin-bottom:20px; border-radius:4px; border:1px solid #ffeeba;">' +
-              '<strong>⚠️ 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' + actionsHtml +
+              '<strong style="display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="hi-icon" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> 历史版本 (只读)</strong> - 您正在查看 <code>' + hash + '</code> 时刻的文件状态。' + actionsHtml +
               '</div>' + rendered;
               
            // Shadow DOM compatible Mermaid rendering using explicit SVG generation APIs
@@ -273,7 +273,7 @@
       if (!container) return;
       
       const title = this.shadowRoot.getElementById('drawer-title');
-      if(title) title.innerHTML = '📄 页面变更时间线';
+      if(title) title.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" class="hi-icon" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg> 页面变更时间线';
       
       const currentFile = decodeURIComponent(this.currentVmRouteFile);
       container.innerHTML = '<span style="color:#999">加载中...</span>';
@@ -318,7 +318,7 @@
       this.shadowRoot.getElementById('git-timeline-drawer').style.transform = 'translateX(0)';
       
       const title = this.shadowRoot.getElementById('drawer-title');
-      if(title) title.innerHTML = '🌍 全局时间线';
+      if(title) title.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" class="hi-icon" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg> 全局时间线';
       
       const container = this.shadowRoot.getElementById('git-timeline-content');
       if (!container) return;
@@ -372,7 +372,7 @@
                          
                          content.innerHTML = 
                             '<div style="background:#eaf2ff; color:#0e5a97; padding:10px; margin-bottom:10px; border-radius:4px; border:1px solid #b8daff;">' +
-                            '<strong>🌍 全局 Commit (只读)</strong> - <code>' + hash + '</code> 时刻的详细变动。' + actionsHtml +
+                            '<strong style="display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="hi-icon" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg> 全局 Commit (只读)</strong> - <code>' + hash + '</code> 时刻的详细变动。' + actionsHtml +
                             '</div>' + diffHtml;
                             
                          let revertBtn = this.shadowRoot.getElementById('btn-revert-global');

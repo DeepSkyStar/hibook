@@ -24,7 +24,7 @@
             // Mount a button in toolbar
             const mountToolbarButton = () => {
                 if (window.addToolbarButton) {
-                    window.addToolbarButton('btn-search', '🔍', 'Search', this.showSearch, 10);
+                    window.addToolbarButton('btn-search', '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', 'Search', this.showSearch, 10);
                 } else {
                     setTimeout(mountToolbarButton, 100);
                 }
@@ -149,7 +149,7 @@
 
                 div.innerHTML = `
                     <div style="font-weight: 600; font-size: 16px; margin-bottom: 4px; color: var(--theme-color, #42b983);">${item.title}</div>
-                    <div style="font-size: 12px; color: #888; margin-bottom: 4px;">📂 ${cleanPath}</div>
+                    <div style="font-size: 12px; color: #888; margin-bottom: 4px; display:flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> ${cleanPath}</div>
                     <div style="font-size: 14px; color: #555; line-height: 1.4;">${item.snippet || ''}</div>
                 `;
 

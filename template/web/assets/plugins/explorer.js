@@ -100,11 +100,11 @@
             controls.innerHTML = '';
             
             const btnSave = document.createElement('button');
-            btnSave.innerHTML = '✅ 保存外部更改';
+            btnSave.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> 保存外部更改';
             const btnDiscard = document.createElement('button');
-            btnDiscard.innerHTML = '🗑️ 抹掉外部更改';
+            btnDiscard.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> 抹掉外部更改';
             const btnHistory = document.createElement('button');
-            btnHistory.innerHTML = '🕰️ 全局历史';
+            btnHistory.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 全局历史';
             
             const hasUncommitted = Object.keys(this.gitStatusData || {}).length > 0;
             
@@ -126,7 +126,7 @@
                  if (msg === null) return;
                  btnSave.style.display = 'none';
                  btnDiscard.style.display = 'none';
-                 btnSave.innerText = '⏳ 正在保存...';
+                 btnSave.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" class="hi-icon" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 正在保存...';
                  fetch((window.HIBOOK_ROOT || '/') + '_api/save_all', { method: 'POST', body: JSON.stringify({ message: msg }), headers: {'Content-Type':'application/json'}})
                  .then(res => res.json()).then(data => {
                       if(data.success) { this.loadTree(); }
@@ -264,7 +264,7 @@
                     let cleanName = item.name;
                     if (cleanName.endsWith('.md')) cleanName = cleanName.slice(0, -3);
                     
-                    itemDiv.innerHTML = `<span style="margin-right:6px; font-size:12px; color:#888;">📄</span>` + 
+                    itemDiv.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; color:#888; vertical-align:-2px"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>' + 
                                         `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cleanName}</span>` + 
                                         badgeHtml;
                                         
@@ -428,8 +428,8 @@
 
             if (item.type === 'folder' || item.type === 'root') {
                 let p = item.type === 'root' ? '' : item.path;
-                addOption('New Note', '📄', () => this.createNode(p, 'file'));
-                addOption('New Folder', '📁', () => this.createNode(p, 'folder'));
+                addOption('New Note', '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>', () => this.createNode(p, 'file'));
+                addOption('New Folder', '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>', () => this.createNode(p, 'folder'));
                 if (item.type !== 'root') {
                     const sep = document.createElement('div');
                     sep.style.height = '1px'; sep.style.backgroundColor = '#eee'; sep.style.margin = '4px 0';
@@ -438,8 +438,8 @@
             }
 
             if (item.type !== 'root') {
-                addOption('Rename', '✏️', () => this.renameNode(item));
-                addOption('Delete', '🗑️', () => this.deleteNode(item));
+                addOption('Rename', '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>', () => this.renameNode(item));
+                addOption('Delete', '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', () => this.deleteNode(item));
             }
 
             this.contextMenu.style.left = x + 'px';
