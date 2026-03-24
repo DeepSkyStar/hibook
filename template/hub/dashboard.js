@@ -196,7 +196,7 @@ async function openWorkspace(name, path) {
 }
 
 function enterWorkspace(name) {
-    window.open(`/${name}/`, '_blank');
+    window.open(`/${name}/`, '_self');
 }
 
 async function stopWorkspace(name) {

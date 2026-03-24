@@ -57,9 +57,10 @@
 
 > **⚠️ 进化分歧 (Evolution Pivot)**: 原计划采用 Tauri 或 PyWebView 强行将 Python 后端包裹进 Native App 里。但实践证明，GUI 原生的 `confirm/alert` 弹窗会灾难性地冻结 Python Daemon 主事件循环（详见 `DEV_GUIDE.md`）。因此全面转向基于纯 `hi_server` 挂载原生虚拟路径映射的 **Web Hub Dashboard**。
 
-* **Daemon 守护进程化**: 抛弃单个知识库独占进程的设计。系统支持 `hibook start -p 3000` 启动全局唯一中枢后台。
-* **聚合调度面板**: `http://localhost:3000/` 原生托管一份美观的纯前端控制台（Hub Dashboard），使得软件可以在单个端口内轻松支持工作区的动态创建（Scaffold）、挂载与安全销毁。
-* **原生 UI 重建**: 所有弹窗、通知均使用纯 HTML/CSS 脱离操作系统 Native 线程注入，彻底斩断 GUI 阻塞死锁。
+* **Daemon 守护进程化**: 抛弃单个知识库独占进程的设计。系统支持 `hibook start -p 3007` 启动全局唯一中枢后台。
+* **聚合调度面板**: `http://localhost:3007/` 原生托管一份美观的纯前端控制台（Hub Dashboard），使得软件可以在单个端口内轻松支持工作区的动态创建（Scaffold）、挂载与安全销毁。
+* **Mac 原生菜单栏集成 (Native Menu Bar App)**: 利用零依赖的 Swift JIT 将 `hibook hub` 编译为原生无痕的后台常驻菜单栏程序，抛弃浏览器的新标签页跳出，实现贴合系统的独立桌面级 Dashboard 体验。
+* **原生 UI 重建**: 所有弹窗、通知均使用纯 HTML/CSS 脱离操作系统 Native 线程直接在 DOM 注入，彻底斩断 GUI 阻塞死锁。
 
 ## Phase 5: Frontend Spaghetti Eradication (Zero-Dependency Modularization)
 *在坚持“零外部构建工具”（不引入 NPM / Vite）的前提下，实现前端视图层代码的现代化重构。*

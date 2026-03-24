@@ -10,7 +10,7 @@ class HiConfig:
         os.makedirs(os.path.dirname(cls._CONFIG_FILE), exist_ok=True)
         if not os.path.exists(cls._CONFIG_FILE):
             cls._save({
-                'port': 3000,
+                'port': 3007,
                 'workspaces': []
             })
 
@@ -26,11 +26,11 @@ class HiConfig:
             with open(cls._CONFIG_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
-            return {'port': 3000, 'workspaces': []}
+            return {'port': 3007, 'workspaces': []}
 
     @classmethod
     def get_port(cls):
-        return cls.get_config().get('port', 3000)
+        return cls.get_config().get('port', 3007)
 
     @classmethod
     def set_port(cls, port):

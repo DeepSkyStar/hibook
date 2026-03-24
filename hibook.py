@@ -103,7 +103,7 @@ def __setup_parser():
         )
     parser_web.add_argument(
         "-p", "--port",
-        help=HiText("menu_web_port", "Port for the web server (default: 3000)"),
+        help=HiText("menu_web_port", "Port for the web server (default: 3007)"),
         nargs=1,
         action="store"
     )
@@ -120,7 +120,7 @@ def __setup_parser():
         name="start",
         help="Start the global Hibook Dashboard Hub."
     )
-    parser_start.add_argument('-p', '--port', type=int, default=3000, help='Port to run the hub on (default 3000)')
+    parser_start.add_argument('-p', '--port', type=int, default=3007, help='Port to run the hub on (default 3007)')
     parser_start.set_defaults(func=cmd_start)
 
     # stop
@@ -142,6 +142,19 @@ def __setup_parser():
         help=HiText("menu_export_help", "Export the book to PDF ready HTML/Markdown.")
         )
     parser_export.set_defaults(func=cmd_export)
+
+    parser_hub = subparsers.add_parser(
+        name="hub",
+        help="Open the native Hibook Hub Menu Bar application."
+    )
+    parser_hub.add_argument(
+        "-p", "--port",
+        help=HiText("menu_web_port", "Port for the web server (default: 3007)"),
+        nargs=1,
+        action="store"
+    )
+    from hi_server import cmd_hub
+    parser_hub.set_defaults(func=cmd_hub)
 
     args = parser.parse_args()
 

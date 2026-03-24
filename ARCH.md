@@ -20,8 +20,8 @@
 * **以 Git 为交互中枢**：所谓的"云端同步"并不是基于自研云服务器同步协议，而是完全暴露出底层的 Git 操作。保存本质上就是 `Commit`，同步本质上就是 `Pull & Push`。
 
 ### 3. 高内聚与职能隔离 (Decoupled Responsibilities)
-* **`hibook.py`**: 纯粹的入口与命令行解析中心（CLI），支持守护进程的启停（start/stop）以及文档库的创建与导出。
-* **`hi_server.py`**: 核心后台守护进程（Daemon）。基于多路复用（Multiplexing）架构，全机器上仅需占用并监听一个固定端口（默认 3000）。通过动态的 URL 前缀命名空间（如 `/kb_name/`）进行多知识库的路由隔离与 API 沙盒限定。根路径 `/` 原生托管聚合所有激活空间状态的 **Web Dashboard Hub**。
+* **`hibook.py`**: 纯粹的入口与命令行解析中心（CLI），支持后台的启停（start/stop）、Hub菜单栏的呼出（hub）以及文档库的导出。
+* **`hi_server.py`**: 核心后台守护进程（Daemon）。基于多路复用（Multiplexing）架构，全机器上仅需监听固定端口（默认 3007）。它内置了基于 Swift 的 **JIT (即时编译) 引擎**，在 Mac 环境下会自动将 Dashboard 零依赖编译并挂载为原生的 Menu Bar (状态栏) 应用 (`MacWebWindowMBIcon`)。根路径 `/` 原生托管核心聚合面板。
 * **`hi_export.py`**: 负责系统级的离线导出及静态文件的硬编排能力。
 * **`hi_search.py` (新增)**: 全局 SQLite 收录与检索引擎，在各个工作区的沙箱内利用原生 `sqlite3` 提供毫秒级全文检索。
 * **`template/web/assets/`**: 知识界面（阅读器、编辑器、图谱）的实体承载区。前端逻辑**彻底抛弃全局函数污染**，全面进化为 Web Components (`<hi-explorer>`, `<hi-editor>`, `<hi-git-timeline>`)。隔离的 Shadow DOM 配合独立加载的 `.css` 样式实现了浏览器原生的零依赖模块化。依赖原生 `fetch` 与 `hi_server` 的 `_api/` 端点通信进行增删改查。

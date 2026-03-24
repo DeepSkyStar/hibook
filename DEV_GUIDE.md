@@ -24,7 +24,7 @@
 
 ## 4. 前端路由的根路径依赖 (Frontend Routing - The `window.HIBOOK_ROOT` Paradigm)
 **踩坑原由**：在编写前端的 JavaScript 插件时，发出的接口请求直接硬编码使用了绝对根路径 `fetch("/_api/...")`。
-**严重后果**：因为重构后 Hibook 的各个工作区是被挂载至多路复用器的子路径下的（比如 `http://localhost:3000/my_note/`）。绝对路径 `/` 的 Fetch 会直接让浏览器剥离掉 `my_note` 命名空间，导致接口 404 或者被错误地路由回了 Hub 根仓库。
+**严重后果**：因为重构后 Hibook 的各个工作区是被挂载至多路复用器的子路径下的（比如 `http://localhost:3007/my_note/`）。绝对路径 `/` 的 Fetch 会直接让浏览器剥离掉 `my_note` 命名空间，导致接口 404 或者被错误地路由回了 Hub 根仓库。
 **铁律 (The Absolute Rule)**：
 * 所有在 UI 侧发出的 REST API 调用都安全地使用 `(window.HIBOOK_ROOT || '/')` 前缀。
 * 正确的写法示范：`fetch((window.HIBOOK_ROOT || '/') + '_api/save')`。
@@ -46,3 +46,11 @@
 **严重后果**：`0` 个节点被渲染成功。原因在于，Docsify 绑定的 marked compiler 是被魔改过的，全局配置一旦启用，原生的 ````mermaid` 会在语法树阶段被**强制截断并变异**为 `<div class="mermaid">` 而再也不是 `code` 块，导致选择器失效。
 **铁律 (The Absolute Rule)**：
 * 不要凭借基础 Markdown 解析经验主观猜想 Docsify 的最终输出结构。所有的挂载操作、钩子定位都应当以真实编译出的 Node Lists 为准。
+
+## 8. WKWebView 缓存毒药死锁与原生路由陷阱 (Native Swift Cache & Routing)
+**踩坑原由**：在构建 Mac 原生桌面端时，最初直接用 `webbrowser` 打开体验极度松散；后来改用 Swift 编译 `WKWebView` 嵌入系统状态栏，却遭遇了 Docsify ServiceWorker 硬缓存导致界面始终陈旧，以及相对链接 `window.open(..., '_blank')` 被安全策略直接静默拦截无法跳转的问题。
+**严重后果**：用户从 Hub 点进知识库被卡死在白屏，刷新也无效。后台的 Python Daemon 如果只杀自己所属进程，会导致 `MacWebWindowMBIcon` 僵尸框架在顶部系统菜单栏无限影分身。
+**铁律 (The Absolute Rule)**：
+* 原生编译的 `WKWebView` 必须在 App 启动时通过 `WKWebsiteDataStore.default().removeData` 强制清理所有的磁盘与内存缓存。
+* 所有的 Hub 跳转事件，凡是交给 Native 框架处理的，必须在 `dashboard.js` 等主线程路由中将 `target="_blank"` 强行阻断并改写为 `_self` 走同窗原路返回跳转。
+* 后台 `hibook stop` 必须附带暴力的 `pkill` 序列，清理掉所有通过 `subprocess` 脱离后台管线的原生二进制执行体分身。

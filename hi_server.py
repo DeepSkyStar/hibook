@@ -1069,7 +1069,7 @@ def cmd_stop(args):
     name = args.get("name")
     import urllib.request
     from hi_config import HiConfig
-    port = HiConfig.get_config().get("port", 3000)
+    port = HiConfig.get_config().get("port", 3007)
     
     if name:
         # Unregister specific namespace
@@ -1087,14 +1087,188 @@ def cmd_stop(args):
         # or implement a shutdown endpoint. Let's just pkill it for now to be robust.
         subprocess.run(['pkill', '-f', f'hibook start -p {port}'])
         subprocess.run(['pkill', '-f', f'hibook start'])
-        HiLog.info(f"Hibook Hub daemon stopped.")
+        subprocess.run(['pkill', '-f', 'MacWebWindowMBIcon'])
+        subprocess.run(['pkill', '-f', 'MacWebWindowMB'])
+        subprocess.run(['pkill', '-f', 'MacWebWindow'])
+        HiLog.info(f"Hibook Hub daemon and UI instances stopped.")
+def cmd_hub(args):
+    port = args.get("port")
+    if type(port) == list and len(port) > 0: port = port[0]
+    port = int(port) if port else 3007
+
+    import urllib.request
+    import urllib.error
+    import subprocess
+    import time
+    
+    is_daemon_alive = False
+    try:
+        req = urllib.request.Request(f"http://localhost:{port}/_api/desktop/ping", method="GET")
+        with urllib.request.urlopen(req, timeout=1) as response:
+            if response.status == 200:
+                is_daemon_alive = True
+    except:
+        pass
+        
+    if not is_daemon_alive:
+        HiLog.info(f"Hub is offline. Automatically spawning Master Daemon in background on port {port}...")
+        subprocess.Popen(['hibook', 'start', '-p', str(port)], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(1.5)
+
+    target_url = f"http://localhost:{port}/"
+    HiLog.info(f"Opening Hibook Hub Menu Bar App at {target_url}")
+    launch_native_app(target_url, port)
+
+def launch_native_app(url, port):
+    import subprocess
+    import tempfile
+    import os
+    
+    bin_dir = os.path.expanduser(os.path.join("~", ".hibook_bin"))
+    os.makedirs(bin_dir, exist_ok=True)
+    bin_name = "MacWebWindowMBIcon"
+    bin_path = os.path.join(bin_dir, bin_name)
+    
+    if not os.path.exists(bin_path):
+        swift_code = """
+import Cocoa
+import WebKit
+
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    var window: NSWindow!
+    var webView: WKWebView!
+    var statusItem: NSStatusItem!
+
+    private func cleanCache() {
+        let websiteDataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        let date = Date(timeIntervalSince1970: 0)
+        WKWebsiteDataStore.default().removeData(ofTypes: websiteDataTypes, modifiedSince: date, completionHandler:{ })
+    }
+
+    func createBookIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        guard let context = NSGraphicsContext.current?.cgContext else { return image }
+        
+        let scale = 16.0 / 24.0
+        context.translateBy(x: 1, y: 1)
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: 0, y: 24)
+        context.scaleBy(x: 1, y: -1)
+        
+        context.setStrokeColor(NSColor.labelColor.cgColor)
+        context.setLineWidth(2.0)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        
+        context.beginPath()
+        context.move(to: CGPoint(x: 4, y: 19.5))
+        context.addCurve(to: CGPoint(x: 6.5, y: 17), control1: CGPoint(x: 4, y: 18.12), control2: CGPoint(x: 5.12, y: 17))
+        context.addLine(to: CGPoint(x: 20, y: 17))
+        context.strokePath()
+        
+        context.beginPath()
+        context.move(to: CGPoint(x: 6.5, y: 2))
+        context.addLine(to: CGPoint(x: 20, y: 2))
+        context.addLine(to: CGPoint(x: 20, y: 22))
+        context.addLine(to: CGPoint(x: 6.5, y: 22))
+        context.addCurve(to: CGPoint(x: 4, y: 19.5), control1: CGPoint(x: 5.12, y: 22), control2: CGPoint(x: 4, y: 20.88))
+        context.addLine(to: CGPoint(x: 4, y: 4.5))
+        context.addCurve(to: CGPoint(x: 6.5, y: 2), control1: CGPoint(x: 4, y: 3.12), control2: CGPoint(x: 5.12, y: 2))
+        context.closePath()
+        context.strokePath()
+        
+        image.unlockFocus()
+        image.isTemplate = true
+        return image
+    }
+
+    func applicationDidFinishLaunching(_ aNotification: Notification) {
+        cleanCache()
+        
+        NSApp.setActivationPolicy(.accessory)
+        
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            button.image = createBookIcon()
+            button.title = ""
+            button.action = #selector(toggleWindow(_:))
+            button.target = self
+        }
+        
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                          backing: .buffered, defer: false)
+        window.delegate = self
+        window.center()
+        window.title = "Hibook Hub"
+        
+        window.isReleasedWhenClosed = false
+        
+        let config = WKWebViewConfiguration()
+        webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
+        webView.autoresizingMask = [.width, .height]
+        window.contentView?.addSubview(webView)
+        
+        let urlArgs = CommandLine.arguments.dropFirst()
+        if let urlStr = urlArgs.first, let url = URL(string: urlStr) {
+            webView.load(URLRequest(url: url))
+        }
+        
+        showWindow()
+    }
+
+    @objc func toggleWindow(_ sender: Any?) {
+        if window.isVisible {
+            window.orderOut(nil)
+        } else {
+            showWindow()
+        }
+    }
+    
+    func showWindow() {
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        window.orderOut(nil)
+        return false
+    }
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()
+"""
+        swift_file = os.path.join(bin_dir, "mac_webview.swift")
+        with open(swift_file, 'w') as f:
+            f.write(swift_code)
+        try:
+            HiLog.info("Precompiling macOS Menu Bar payload for the first time...")
+            subprocess.run(["swiftc", swift_file, "-o", bin_path], check=True, capture_output=True)
+        except Exception as e:
+            HiLog.error("Failed to compile native macOS template. Falling back to default external browser.")
+            import webbrowser
+            webbrowser.open(url)
+            return
+
+    try:
+        subprocess.Popen([bin_path, url], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        HiLog.info("Launched Native Menu Bar App successfully.")
+    except Exception as e:
+        import webbrowser
+        webbrowser.open(url)
+
 
 def cmd_web(args):
     port = args.get("port")
     name = args.get("name")
     if type(port) == list and len(port) > 0: port = port[0]
     if type(name) == list and len(name) > 0: name = name[0]
-    port = int(port) if port else 3000
+    port = int(port) if port else 3007
     root_dir = os.getcwd()
     
     if not name:
@@ -1128,7 +1302,7 @@ def cmd_web(args):
         with urllib.request.urlopen(req) as response:
             target_url = f"http://localhost:{port}/{name}/"
             HiLog.info(f"Successfully mounted at {target_url}")
-            webbrowser.open(target_url)
+            launch_native_app(target_url, port)
     except urllib.error.HTTPError as e:
         if e.code == 409:
             HiLog.error(f"Name conflict! Workspace name '{name}' is already attached to a different repository.")
