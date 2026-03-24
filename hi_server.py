@@ -1124,6 +1124,15 @@ def launch_native_app(url, port):
     import tempfile
     import os
     
+    # Global Singleton Check
+    try:
+        res = subprocess.run(['pgrep', '-f', 'MacWebWindowMBIcon'], capture_output=True)
+        if res.returncode == 0:
+            HiLog.info(f"Existing Hibook Hub Menu Bar App detected. Singleton lock activated.")
+            return
+    except:
+        pass
+    
     bin_dir = os.path.expanduser(os.path.join("~", ".hibook_bin"))
     os.makedirs(bin_dir, exist_ok=True)
     bin_name = "MacWebWindowMBIcon"
